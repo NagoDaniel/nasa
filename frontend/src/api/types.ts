@@ -409,3 +409,9 @@ export type PlanResponse = {
   }
   method: string[]
 }
+
+export type PlaceResult = {
+  name: string; detail: string; type: string | null; lon: number; lat: number
+  bbox: [number, number, number, number] | null
+  commune: { id: string; name: string; county: string; county_name: string } | null
+}

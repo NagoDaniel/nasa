@@ -602,6 +602,9 @@ STATIC: dict[str, str] = {
     "06-01 – 07-31": "01.06 – 31.07",
     # routers: errors shown to the user
     "Too many requests, please wait a moment": "Prea multe cereri, vă rog așteptați puțin",
+    "Too many searches, please wait a moment": "Prea multe căutări, vă rog așteptați puțin",
+    "Place search is not available right now": "Căutarea locurilor nu este disponibilă acum",
+    "Type at least 2 characters": "Scrieți cel puțin 2 caractere",
     "Too many changes, please wait a moment": "Prea multe modificări, vă rog așteptați puțin",
     "Too many saved fields; delete some first": "Prea multe parcele salvate; ștergeți câteva întâi",
     "Field not found": "Parcela nu a fost găsită",

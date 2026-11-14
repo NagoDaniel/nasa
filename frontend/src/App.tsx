@@ -6,6 +6,8 @@ import { I18nProvider, useI18n } from './i18n'
 import type { Dict } from './i18n/en'
 import AssistantWidget from './assistant/AssistantWidget'
 import AreaBar from './layout/AreaBar'
+import type { Located } from './layout/PlaceSearch'
+import { useBottomSheet, useIsPhone } from './layout/useBottomSheet'
 import type { DrawMode, FieldOverlays, Ring } from './map/draw'
 import { FieldLink, type FieldLinkCtx } from './state/FieldLink'
 import FieldView from './views/farmer/FieldView'
@@ -121,17 +123,31 @@ function Shell() {
     mapRef.current?.flyTo(u.point, u.kind === 'county' ? 7.7 : 10.2)
   }, [byId])
 
+  // place search: select the commune holding the place, then zoom to the place itself
+  const locate = useCallback((l: Located) => {
+    if (l.unitId && byId.has(l.unitId)) {
+      setSelectedId(l.unitId)
+      setNotice(null)
+    }
+    if (l.bbox) mapRef.current?.fitBounds(l.bbox, l.zoom)
+    else mapRef.current?.flyTo([l.lon, l.lat], l.zoom)
+  }, [byId])
+
   const onMapSelect = useCallback((p: MapPick) => {
     if (!p.inAoi) return setNotice(p.name)
     setNotice(null)
     setSelectedId(p.id)
   }, [])
 
+  const phone = useIsPhone()
+  const sheet = useBottomSheet(phone)
+  const { setOpen: setSheetOpen } = sheet
   const goTo = useCallback((s: string) => {
     const r: Role = (SECTIONS.farmer as readonly string[]).includes(s) ? 'farmer' : 'procurement'
     setRole(r)
     setSections((prev) => ({ ...prev, [r]: s }))
-  }, [])
+    setSheetOpen(true) // phone: choosing a section opens the sheet
+  }, [setSheetOpen])
 
   // Drawn field ("My field" section).
   const [drawMode, setDrawMode] = useState<DrawMode>('off')
@@ -139,6 +155,9 @@ function Shell() {
   const [liveRing, setLiveRing] = useState<Ring | null>(null)
   const [fieldOverlays, setFieldOverlays] = useState<FieldOverlays>({})
   const fieldActive = role === 'farmer' && sections.farmer === 'field'
+  useEffect(() => {
+    if (phone && (drawMode === 'rect' || drawMode === 'poly')) setSheetOpen(false) // drawing needs the map
+  }, [phone, drawMode, setSheetOpen])
   const planActive = role === 'farmer' && sections.farmer === 'plan'
   const onFieldChange = useCallback((r: Ring | null, final: boolean) => {
     setLiveRing(r)
@@ -165,14 +184,14 @@ function Shell() {
   return (
     <MapLink.Provider value={link}>
     <FieldLink.Provider value={fieldLink}>
-      <div className={`app ${navCollapsed ? 'nav-collapsed' : ''} ${panelOpen ? '' : 'panel-closed'}`}>
+      <div className={`app ${navCollapsed ? 'nav-collapsed' : ''} ${panelOpen ? '' : 'panel-closed'} ${sheet.open ? 'sheet-up' : ''}`}>
         <Sidebar
           role={role} setRole={setRole}
           section={section} setSection={(s: Section) => goTo(s)}
           collapsed={navCollapsed} setCollapsed={setNavCollapsed}
         />
         <div className="main">
-          <AreaBar units={units.data ?? []} selectedId={selectedId} onSelect={selectArea} notice={notice} />
+          <AreaBar units={units.data ?? []} selectedId={selectedId} onSelect={selectArea} onLocate={locate} notice={notice} />
           <div className="work">
             <div className="map-pane">
               <RomaniaMap
@@ -203,8 +222,10 @@ function Shell() {
                 <button type="button" className="panel-open-btn" onClick={() => setPanelOpen(true)}>‹ {t('showPanel')}</button>
               )}
             </div>
-            <section className="panel" aria-label={t(`nav_${section}` as keyof Dict)}>
-              <header className="panel-head">
+            <section className={`panel ${sheet.open ? 'sheet-open' : ''}`} aria-label={t(`nav_${section}` as keyof Dict)} ref={sheet.sheetRef}>
+              <header className="panel-head" ref={sheet.headRef} {...sheet.headHandlers}
+                aria-expanded={phone ? sheet.open : undefined}>
+                {phone && <span className="sheet-grab" aria-hidden="true" />}
                 <div>
                   <div className="panel-area">{sel?.name ?? 'Alba'}{sel?.kind === 'commune' && <span className="muted"> · {countyName}</span>}</div>
                   <h2>{t(`nav_${section}` as keyof Dict)}</h2>
