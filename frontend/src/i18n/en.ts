@@ -83,6 +83,7 @@ export const en = {
   noData: 'no data',
   countyFigure: 'county figure',
   // layout, sections and overview
+  nav_field: 'My field',
   nav_overview: 'Overview',
   nav_weather: 'Weather & water',
   nav_risks: 'Season risks',
@@ -92,6 +93,7 @@ export const en = {
   nav_sourcing: 'Sourcing map',
   nav_recs: 'Recommendations',
   nav_trends: 'Trends & data',
+  intro_field: 'Draw your field (drag a box or click its corners) to see satellite vegetation measured on it, and the coarser weather data for the area around it.',
   intro_overview: 'The key facts for this area. Click a tile to see it on the map.',
   intro_weather: 'How rain, heat and soil water changed from 2015 to 2025.',
   intro_risks: 'Years when weather hit the crops at a sensitive moment.',

@@ -218,3 +218,112 @@ export type ChatTurn = { role: 'user' | 'assistant'; text: string; sig?: string 
 export type ChatContext = { unit_id: string | null; role: 'farmer' | 'procurement'; section: string; lang: 'en' | 'ro' }
 
 export type AssistantStatus = { llm: boolean; max_chars: number; limits: { per_minute: number; per_day: number }; llm_available_today: boolean }
+
+// ---------- drawn fields ----------
+export type FieldPolygon = import('geojson').Polygon
+export type FieldCommune = { id: string; name: string; county: string; county_name: string; share_pct: number }
+export type FieldMeasure = {
+  area_ha: number
+  perimeter_m: number
+  centroid: [number, number]
+  bbox: [number, number, number, number]
+  commune: FieldCommune | null
+  geometry: FieldPolygon
+  warnings?: string[]
+}
+export type SavedField = { id: number; name: string; area_ha: number | null; commune_id: string | null; geometry: FieldPolygon }
+
+export type CellEntry = {
+  cell: string
+  center: [number, number]
+  geometry: import('geojson').Polygon
+  cell_area_km2: number
+  share_of_field_pct: number
+  field_share_of_cell_pct: number | null
+  status: 'ok' | 'no_data'
+  yearly?: Record<string, number>
+  latest_month?: { month: string; value: number } | null
+  last_12_months?: { month: string; value: number | null }[]
+  missing_months?: number
+}
+export type CellDataset = {
+  dataset: string
+  label: string
+  unit: string
+  aggregation: 'sum' | 'mean'
+  about: string
+  source: string
+  resolution: string
+  period: { start: string; end: string }
+  last_day?: string
+  kind: 'surrounding_area_estimate'
+  note: string
+  cells: CellEntry[]
+}
+export type SoilContext = {
+  status: 'ok' | 'no_data' | 'unavailable'
+  source: string
+  kind: 'model_pixels'
+  resolution?: string
+  note: string
+  properties: Record<string, { label: string; unit: string }>
+  values?: Record<string, { mean: number; min: number; max: number } | null>
+  pixels?: { count: number; selection: string; pixel_size_m: [number, number]; pixel_area_ha: number; pixels: import('geojson').FeatureCollection } | null
+}
+export type SmapContext = {
+  dataset: string
+  status: 'ok' | 'no_data'
+  label?: string
+  unit?: string
+  source: string
+  resolution: string
+  kind?: 'commune_average'
+  commune?: string
+  latest_month?: { month: string; value: number } | null
+  last_12_months?: { month: string; value: number | null }[]
+  note: string
+}
+export type FieldContextResp = { field: FieldMeasure; cells: CellDataset[]; soil: SoilContext; smap: SmapContext | null }
+
+export type ObsStatus = 'clear' | 'partly_cloudy' | 'suspect' | 'cloudy' | 'no_data' | 'error'
+export type VegObs = {
+  date: string
+  datetime: string
+  source: 'hls' | 's2'
+  sensor: string
+  tile: string
+  item_id: string
+  scene_cloud_pct: number | null
+  status: ObsStatus
+  pixel_size_m: number
+  pixels_in_field: number | null
+  pixel_selection?: string
+  valid_pixels?: number
+  valid_pct: number | null
+  ndvi: { mean: number; median: number; p10: number; p90: number } | null
+  note?: string
+}
+export type VegPeak = { year: number; window: string; value: number | null; n_used: number; n_read: number; dates: string[]; status: string }
+export type VegSource = {
+  status: 'ok' | 'error' | 'unavailable'
+  label?: string
+  short?: string
+  resolution_m?: number
+  cloud_mask?: string
+  nasa?: boolean
+  note?: string
+  observations?: VegObs[]
+  counts?: Partial<Record<ObsStatus, number>>
+  latest_clear?: (VegObs & { overlay: { image: string; corners: [number, number][]; pixel_size_m: number; date: string; sensor: string; pixels_in_field: number } | null }) | null
+  peaks?: VegPeak[]
+}
+export type VegResult = {
+  field: Omit<FieldMeasure, 'geometry'>
+  fetched_at: string
+  season: { year: number; start: string; end: string }
+  index: string
+  status_rules: Record<string, string>
+  pending: string[]
+  sources: Partial<Record<'hls' | 's2', VegSource>>
+}
+export type VegJob = { job_id: string; status: 'queued' | 'running' | 'done' | 'error'; stage: string; progress: { done: number; total: number }; error: string | null; result: VegResult | null }

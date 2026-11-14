@@ -26,7 +26,6 @@ from .tools import catalog
 router = APIRouter(tags=["assistant"])
 log = logging.getLogger("app.assistant")
 STATS: Counter = Counter()  # counts only, never message content
-MAX_BODY = 8 * 1024
 _action = TypeAdapter(Action)
 
 UNVERIFIED = {
@@ -186,8 +185,3 @@ def _offline(msg: str, lang: str, kind: str) -> ORJSONResponse:
         return _rule(RuleReply(text("which", lang, name=hits[0].name), choices=hits), "offline", prefix=text(kind, lang))
     return _respond(text(kind, lang), "offline")
 
-
-def body_limit_ok(request: Request) -> bool:
-    """Checked by the middleware in main.py before the body is read."""
-    cl = request.headers.get("content-length")
-    return cl is not None and cl.isdigit() and int(cl) <= MAX_BODY

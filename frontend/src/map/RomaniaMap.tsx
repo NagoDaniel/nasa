@@ -13,6 +13,7 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { fmt } from '../components/format'
 import type { ResolvedLayer } from '../state/MapLink'
+import { FieldDrawer, type DrawMode, type FieldOverlays, type Ring } from './draw'
 import { countyColorExpression } from './regionColors'
 import { NO_DATA, digitsFor } from './scales'
 import {
@@ -40,7 +41,10 @@ export type MapPick = {
   inAoi: boolean
 }
 
-export type MapHandle = { flyTo: (center: [number, number], zoom: number) => void }
+export type MapHandle = {
+  flyTo: (center: [number, number], zoom: number) => void
+  fitBounds: (bbox: [number, number, number, number], maxZoom?: number) => void
+}
 
 type Props = {
   /** Selected area id (county code or commune id); the map only displays it. */
@@ -56,6 +60,12 @@ type Props = {
   noDataLabel?: string
   /** Shown when a commune displays its county's value. */
   countyFigureLabel?: string
+  /** Field drawing (farmer "My field" section). */
+  drawMode?: DrawMode
+  fieldRing?: Ring | null
+  onFieldChange?: (ring: Ring | null, final: boolean) => void
+  fieldOverlays?: FieldOverlays
+  onSavedFieldClick?: (id: number) => void
 }
 
 type FeatureRef = { source: 'counties' | 'communes'; id: string }
@@ -64,19 +74,22 @@ const match = (prop: string, pairs: string[]): ExpressionSpecification | string 
   pairs.length ? (['match', ['get', prop], ...pairs, NO_DATA] as unknown as ExpressionSpecification) : NO_DATA
 
 const RomaniaMap = forwardRef<MapHandle, Props>(function RomaniaMap(
-  { selectedId, onSelect, highlightId = null, onHover, layer = null, initialBounds = RO_BOUNDS, outsideLabel = 'Outside study area', noDataLabel = 'no data', countyFigureLabel = 'county figure' },
+  { selectedId, onSelect, highlightId = null, onHover, layer = null, initialBounds = RO_BOUNDS, outsideLabel = 'Outside study area', noDataLabel = 'no data', countyFigureLabel = 'county figure',
+    drawMode = 'off', fieldRing = null, onFieldChange, fieldOverlays, onSavedFieldClick },
   handle,
 ) {
   const container = useRef<HTMLDivElement>(null)
   const tip = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MlMap | null>(null)
   const [ready, setReady] = useState(false)
-  const latest = useRef({ onSelect, onHover, layer, outsideLabel, noDataLabel, countyFigureLabel })
-  latest.current = { onSelect, onHover, layer, outsideLabel, noDataLabel, countyFigureLabel }
+  const latest = useRef({ onSelect, onHover, layer, outsideLabel, noDataLabel, countyFigureLabel, onFieldChange, onSavedFieldClick })
+  latest.current = { onSelect, onHover, layer, outsideLabel, noDataLabel, countyFigureLabel, onFieldChange, onSavedFieldClick }
+  const drawer = useRef<FieldDrawer | null>(null)
   const shown = useRef<{ selected: FeatureRef | null; highlight: FeatureRef | null; hover: FeatureRef | null }>({ selected: null, highlight: null, hover: null })
 
   useImperativeHandle(handle, () => ({
     flyTo: (center, zoom) => mapRef.current?.easeTo({ center, zoom, duration: 700 }),
+    fitBounds: (b, maxZoom = 16.5) => mapRef.current?.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 60, maxZoom, duration: 700 }),
   }), [])
 
   useEffect(() => {
@@ -111,7 +124,7 @@ const RomaniaMap = forwardRef<MapHandle, Props>(function RomaniaMap(
         fitBoundsOptions: { padding: 24 },
         maxBounds: RO_MAX_BOUNDS,
         minZoom: 5.5,
-        maxZoom: 15,
+        maxZoom: 18,
         attributionControl: false,
         dragRotate: false,
         pitchWithRotate: false,
@@ -127,6 +140,7 @@ const RomaniaMap = forwardRef<MapHandle, Props>(function RomaniaMap(
         if (cancelled) return
         // Start the compact attribution collapsed (it covers half the map on phones).
         container.current?.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show')
+        drawer.current = new FieldDrawer(m, (r, final) => latest.current.onFieldChange?.(r, final), (id) => latest.current.onSavedFieldClick?.(id))
         setReady(true)
       })
       // The pane can change size (sidebar / data panel open-close).
@@ -149,6 +163,11 @@ const RomaniaMap = forwardRef<MapHandle, Props>(function RomaniaMap(
       }
 
       m.on('mousemove', (e) => {
+        if (drawer.current?.busy()) {
+          setHover(null)
+          if (tip.current) tip.current.style.display = 'none'
+          return
+        }
         const f = pick(e)
         const el = tip.current
         if (!f) {
@@ -187,6 +206,7 @@ const RomaniaMap = forwardRef<MapHandle, Props>(function RomaniaMap(
         if (tip.current) tip.current.style.display = 'none'
       })
       m.on('click', (e) => {
+        if (drawer.current?.busy()) return
         const f = pick(e)
         if (!f) return
         const p = f.properties as Record<string, string>
@@ -208,10 +228,23 @@ const RomaniaMap = forwardRef<MapHandle, Props>(function RomaniaMap(
       mapRef.current = null
       shown.current = { selected: null, highlight: null, hover: null }
       setReady(false)
+      drawer.current?.destroy()
+      drawer.current = null
       map?.remove()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Field drawing state and overlays.
+  useEffect(() => {
+    if (ready) drawer.current?.setMode(drawMode)
+  }, [drawMode, ready])
+  useEffect(() => {
+    if (ready) drawer.current?.setRing(fieldRing)
+  }, [fieldRing, ready])
+  useEffect(() => {
+    if (ready) drawer.current?.setOverlays(fieldOverlays ?? {})
+  }, [fieldOverlays, ready])
 
   // Selected area outline.
   useEffect(() => {

@@ -1455,8 +1455,13 @@ source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "google-genai" },
+    { name = "httpx" },
+    { name = "numpy" },
     { name = "orjson" },
     { name = "pydantic-settings" },
+    { name = "pyproj" },
+    { name = "rasterio" },
+    { name = "shapely" },
     { name = "sqlmodel" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1487,8 +1492,13 @@ scripts = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "google-genai", specifier = ">=3.3.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "numpy", specifier = ">=2.5.4" },
     { name = "orjson", specifier = ">=3.10" },
     { name = "pydantic-settings", specifier = ">=2.6" },
+    { name = "pyproj", specifier = ">=3.8.0" },
+    { name = "rasterio", specifier = ">=1.5.2" },
+    { name = "shapely", specifier = ">=2.2.0" },
     { name = "sqlmodel", specifier = ">=0.0.22" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]

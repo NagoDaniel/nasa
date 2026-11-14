@@ -8,7 +8,7 @@ from fastapi.responses import ORJSONResponse
 from .assistant import router as assistant
 from .config import settings
 from .db import init_db
-from .routers import area, crops, geo, health, nasa
+from .routers import area, crops, fields, geo, health, nasa
 
 
 @asynccontextmanager
@@ -31,13 +31,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (health.router, geo.router, nasa.router, area.router, crops.router, assistant.router):
+for r in (health.router, geo.router, nasa.router, area.router, crops.router, fields.router, assistant.router):
     app.include_router(r, prefix="/api")
 
 
+BODY_LIMITS = {"/api/assistant": 8 * 1024, "/api/fields": 64 * 1024}
+
+
 @app.middleware("http")
-async def assistant_body_limit(request: Request, call_next):
-    """Reject oversized or unsized assistant requests before the body is read."""
-    if request.method == "POST" and request.url.path.startswith("/api/assistant") and not assistant.body_limit_ok(request):
-        return ORJSONResponse({"detail": "Request too large"}, status_code=413)
+async def body_limit(request: Request, call_next):
+    """Reject oversized or unsized request bodies on write endpoints before they are read."""
+    if request.method in ("POST", "PUT", "PATCH"):
+        for prefix, limit in BODY_LIMITS.items():
+            if request.url.path.startswith(prefix):
+                cl = request.headers.get("content-length")
+                if cl is None or not cl.isdigit() or int(cl) > limit:
+                    return ORJSONResponse({"detail": "Request too large"}, status_code=413)
     return await call_next(request)

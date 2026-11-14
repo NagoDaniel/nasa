@@ -35,5 +35,12 @@ class Settings(BaseSettings):
     # Random per process when unset (history from before a restart is then simply dropped).
     assistant_secret: SecretStr | None = None
 
+    # --- Drawn fields (app/field). HLS needs an Earthdata login: ~/.netrc (machine
+    # urs.earthdata.nasa.gov) or a bearer token here. Sentinel-2 needs no account.
+    earthdata_token: SecretStr | None = None
+    rate_field_jobs_per_min: int = 4  # imagery jobs per client IP
+    rate_field_jobs_per_day: int = 60
+    max_saved_fields: int = 300
+
 
 settings = Settings()

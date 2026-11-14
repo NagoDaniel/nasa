@@ -27,7 +27,7 @@ aligned with `keys` (`null` = no data).
 
 - `units` keys = county `code` (e.g. `AB`) or commune `id` (e.g. `AB-0012`) from the geo layers.
 - `aggregation` says how months combine into a year (`sum` for totals, `mean` for states).
-- `status` is `sample` while only an AppEEARS sample exists (MOD13Q1 NDVI today).
+- `status` is `complete` for every dataset (`sample` is reserved for partial test downloads; none in use).
 - Gridded values are area-weighted means of the grid cells overlapping the unit.
 - Always fill `source`, `period`, `resolution` and `confidence` — the UI shows them on every chart.
 

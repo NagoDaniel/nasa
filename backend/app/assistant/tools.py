@@ -22,7 +22,7 @@ from ..scoring.procurement import procurement
 from ..scoring.rotation import score_rotation
 from . import places
 
-FARMER_SECTIONS = ("overview", "weather", "risks", "soil", "crops", "rotations")
+FARMER_SECTIONS = ("overview", "field", "weather", "risks", "soil", "crops", "rotations")
 PROCUREMENT_SECTIONS = ("sourcing", "recs", "trends")
 SECTIONS = FARMER_SECTIONS + PROCUREMENT_SECTIONS
 B_CROPS = ("oats", "barley", "maize", "pea", "chickpea", "flax", "sunflower")  # direction B (pet food)

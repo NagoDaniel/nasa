@@ -1,5 +1,5 @@
 import type { FeatureCollection } from 'geojson'
-import type { AreaBundle, AssistantStatus, ChatContext, ChatResponse, ChatTurn, Forecast, MapLayerData, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
+import type { AreaBundle, AssistantStatus, FieldContextResp, FieldMeasure, FieldPolygon, SavedField, VegJob, ChatContext, ChatResponse, ChatTurn, Forecast, MapLayerData, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
 
 const BASE = '/api'
 
@@ -52,3 +52,16 @@ export async function postChat(message: string, history: ChatTurn[], context: Ch
   }
   throw new Error(String(res.status))
 }
+
+// ---------- drawn fields ----------
+const post = <T,>(path: string, body: unknown, method = 'POST', signal?: AbortSignal) =>
+  getJson<T>(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
+
+export const measureField = (geometry: FieldPolygon, signal?: AbortSignal) => post<FieldMeasure>('/fields/measure', { geometry }, 'POST', signal)
+export const fieldContext = (geometry: FieldPolygon, signal?: AbortSignal) => post<FieldContextResp>('/fields/context', { geometry }, 'POST', signal)
+export const startVegetation = (geometry: FieldPolygon) => post<VegJob>('/fields/vegetation', { geometry })
+export const getVegetationJob = (id: string) => getJson<VegJob>(`/fields/vegetation/${encodeURIComponent(id)}`)
+export const listFields = () => getJson<SavedField[]>('/fields')
+export const createField = (name: string, geometry: FieldPolygon) => post<SavedField>('/fields', { name, geometry })
+export const updateField = (id: number, patch: { name?: string; geometry?: FieldPolygon }) => post<SavedField>(`/fields/${id}`, patch, 'PUT')
+export const deleteField = (id: number) => getJson<{ deleted: number }>(`/fields/${id}`, { method: 'DELETE' })
