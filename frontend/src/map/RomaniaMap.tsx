@@ -54,6 +54,8 @@ type Props = {
   initialBounds?: LngLatBoundsLike
   outsideLabel?: string
   noDataLabel?: string
+  /** Shown when a commune displays its county's value. */
+  countyFigureLabel?: string
 }
 
 type FeatureRef = { source: 'counties' | 'communes'; id: string }
@@ -62,15 +64,15 @@ const match = (prop: string, pairs: string[]): ExpressionSpecification | string 
   pairs.length ? (['match', ['get', prop], ...pairs, NO_DATA] as unknown as ExpressionSpecification) : NO_DATA
 
 const RomaniaMap = forwardRef<MapHandle, Props>(function RomaniaMap(
-  { selectedId, onSelect, highlightId = null, onHover, layer = null, initialBounds = RO_BOUNDS, outsideLabel = 'Outside study area', noDataLabel = 'no data' },
+  { selectedId, onSelect, highlightId = null, onHover, layer = null, initialBounds = RO_BOUNDS, outsideLabel = 'Outside study area', noDataLabel = 'no data', countyFigureLabel = 'county figure' },
   handle,
 ) {
   const container = useRef<HTMLDivElement>(null)
   const tip = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MlMap | null>(null)
   const [ready, setReady] = useState(false)
-  const latest = useRef({ onSelect, onHover, layer, outsideLabel, noDataLabel })
-  latest.current = { onSelect, onHover, layer, outsideLabel, noDataLabel }
+  const latest = useRef({ onSelect, onHover, layer, outsideLabel, noDataLabel, countyFigureLabel })
+  latest.current = { onSelect, onHover, layer, outsideLabel, noDataLabel, countyFigureLabel }
   const shown = useRef<{ selected: FeatureRef | null; highlight: FeatureRef | null; hover: FeatureRef | null }>({ selected: null, highlight: null, hover: null })
 
   useImperativeHandle(handle, () => ({
@@ -165,8 +167,12 @@ const RomaniaMap = forwardRef<MapHandle, Props>(function RomaniaMap(
           let line = ''
           if (!inAoi) line = latest.current.outsideLabel
           else if (l) {
-            const v = l.values[id]
-            line = v === null || v === undefined ? `${l.label}: ${latest.current.noDataLabel}` : `${l.label}: <b>${fmt(v, digitsFor(l.scale.max))} ${l.unit}</b>`
+            // County-level layers (e.g. procurement scores from county statistics): a commune shows its county's value.
+            const viaCounty = l.level === 'county' && id.includes('-')
+            const v = l.values[viaCounty ? p.county : id]
+            line = v === null || v === undefined
+              ? `${l.label}: ${latest.current.noDataLabel}`
+              : `${l.label}: <b>${fmt(v, digitsFor(l.scale.max))} ${l.unit}</b>${viaCounty ? ` <span class="map-tip-note">(${latest.current.countyFigureLabel})</span>` : ''}`
           }
           el.innerHTML = `<div class="map-tip-name"></div><div class="map-tip-val">${line}</div>`
           ;(el.firstChild as HTMLElement).textContent = p.county_name ? `${p.name} · ${p.county_name}` : p.name

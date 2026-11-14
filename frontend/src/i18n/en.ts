@@ -81,6 +81,7 @@ export const en = {
   legendLow: 'low',
   legendHigh: 'high',
   noData: 'no data',
+  countyFigure: 'county figure',
   // layout, sections and overview
   nav_overview: 'Overview',
   nav_weather: 'Weather & water',

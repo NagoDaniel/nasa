@@ -78,6 +78,7 @@ export const ro: Dict = {
   legendLow: 'scăzut',
   legendHigh: 'ridicat',
   noData: 'fără date',
+  countyFigure: 'cifră la nivel de județ',
   // layout, sections and overview
   nav_overview: 'Rezumat',
   nav_weather: 'Vreme și apă',

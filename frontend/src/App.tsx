@@ -139,6 +139,7 @@ function Shell() {
                 initialBounds={AOI_BOUNDS}
                 outsideLabel={t('outsideStudy')}
                 noDataLabel={t('noData')}
+                countyFigureLabel={t('countyFigure')}
               />
               <MapLegend
                 layer={layer}
