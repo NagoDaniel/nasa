@@ -92,22 +92,32 @@ Other open data: Copernicus Data Space (Sentinel-1/2), **EUCROPMAP 2018** (JRC, 
 backend/
   app/main.py            FastAPI app; GZip, CORS (localhost:5173), ORJSONResponse; routers under /api
   app/config.py          Settings (env prefix S2F_): data_dir, db_url, cors_origins, json_hot_reload
-  app/db.py, models.py   SQLModel engine; tables Farm, Field_ ("field"), FarmerPriorities (yield/water/soil/risk weights)
+  app/db.py, models.py   SQLModel engine; tables Farm, Field_ ("field"), FarmerPriorities (not used by the UI yet)
   app/json_store.py      store.get(rel) -> parsed, store.raw(rel) -> bytes, store.list(subdir)
+  app/datasets.py        typed accessors over the processed JSON (units, indicators, agro, soil, ins, traits, cropmap)
+  app/scoring/hazards.py hazard-year thresholds (stated assumptions) + small stats helpers
+  app/scoring/rotation.py   rotation scores: yield / water / soil / risk, each with factors[] (pure functions)
+  app/scoring/procurement.py per-county availability / quality / impact + rule-based recommendations
   app/routers/health.py  GET /api/health
-  app/routers/geo.py     GET /api/geo, /api/geo/{counties|regions|communes|outline|mask|labels}
-  app/routers/nasa.py    GET /api/nasa, /api/nasa/{dataset}?unit=<id>, /api/nasa/crops/{direction}
-  data/geo/*.geojson.json   generated boundary layers (committed)
-  data/nasa/             NASA datasets as JSON — schema in data/nasa/README.md (currently empty)
-  data/crops/smart_feed.json  direction-B crop list (ids + RO/EN/HU names; traits still TODO)
-  scripts/build_boundaries.py  regenerates data/geo (uv dependency group "scripts": geopandas, shapely, requests)
-  .cache/                downloaded raw sources (gitignored)
+  app/routers/geo.py     GET /api/geo/{counties|regions|communes|outline|mask|labels}
+  app/routers/nasa.py    GET /api/nasa, /api/nasa/{dataset}, /api/nasa/crops/{direction}
+  app/routers/area.py    GET /api/units, GET /api/area/{unit}  (farmer dashboard bundle)
+  app/routers/crops.py   GET /api/crops/traits, /api/crops/stats?county=, POST /api/rotations/score, GET /api/procurement?crop=
+  data/                  processed JSON (committed) — see section 3
+  scripts/build_boundaries.py  regenerates data/geo (uv group "scripts")
+  scripts/process/       raw -> JSON pipeline (uv group "process"); build_all.py runs every step
+  scripts/download/      raw download scripts (see dataset.md)
+  tests/                 pytest: scoring + grid weights (uv group "dev")
+  .cache/raw/            raw downloads (gitignored; nasa-field-shift/data symlinks here)
 frontend/
-  src/App.tsx            header + map + side panel (selected area, region legend)
-  src/api/client.ts      getJson(), getGeoLayer() — base "/api" (Vite proxies to :8000)
-  src/map/RomaniaMap.tsx MapLibre map; emits AreaSelection (county | commune) via onSelect; Alba preselected
-  src/map/style.ts       basemap URL, bounds, layer specs (lowLayers under roads, topLayers incl. mask)
-  src/map/regionColors.ts REGION_COLORS, COUNTY_REGION, countyColor(), countyColorExpression
+  src/App.tsx            top bar (Farmer | Procurement tabs, EN/RO) + map pane + dashboard
+  src/i18n/              en.ts / ro.ts dictionaries, names.ts (crop + indicator names), I18nProvider/useI18n
+  src/api/client.ts, types.ts  typed API calls (base "/api", Vite proxies to :8000)
+  src/components/        Chart (ECharts 6 wrapper), SourceNote + ConfidenceBadge (transparency footer), Card, useAsync, format
+  src/views/farmer/      FarmerView: IndicatorCard, SeasonEvents, SoilCard, CropStatsCard, CropMixCard, PrioritiesPanel, RotationCompare
+  src/views/procurement/ ProcurementView: crop picker, county table, recommendations, production chart, choropleth
+  src/map/RomaniaMap.tsx MapLibre map; AreaSelection via onSelect; choropleth prop; non-AOI counties greyed
+  src/map/style.ts       basemap, AOI list, layer specs, COUNTY_OPACITY / CHOROPLETH_OPACITY
   vite.config.ts         /api proxy; optimizeDeps.exclude maplibre-gl (its ESM worker breaks if pre-bundled)
 .claude/launch.json      preview configs "backend" (:8000) and "frontend" (:5173)
 ```
@@ -116,9 +126,18 @@ frontend/
 ```bash
 cd backend && uv sync && uv run uvicorn app.main:app --reload --port 8000   # docs at /docs
 cd frontend && pnpm install && pnpm dev                                      # http://localhost:5173
+cd backend && uv run --group process python scripts/process/build_all.py    # raw -> JSON (all steps, ~15 s)
+cd backend && uv run --group process python scripts/process/build_all.py soil ins   # selected steps
+cd backend && uv run --group process --group dev pytest -q                  # tests
 cd backend && uv run --group scripts python scripts/build_boundaries.py      # rebuild geo layers
 cd frontend && pnpm build                                                    # tsc -b + vite build (must pass)
 ```
+
+### Dashboard (v1)
+- **Farmer tab:** select a county or commune of the study area → NASA indicator cards (per year 2015–2025 / by month), crop-season weather events table (hazard years), soil (SoilGrids 0–30 cm), county yields (INS), crop mix (EUCROPMAP), priorities sliders, rotation comparison (2–3 rotations, 3–4 years) with factor-by-factor explanations. AI section is a placeholder: **the AI role is not decided yet** — don't show AI output until it is.
+- **Procurement tab:** pick a direction-B crop → county choropleth + table (availability / quality / impact / confidence), recommendations (spread purchases, this-season quality check, alternative ingredient, pea-contract impact estimate), production chart, assumptions + sources.
+- Every card carries a `SourceNote` (source, period, resolution, confidence, assumptions). Keep it that way.
+- RO toggle translates UI chrome, crop and indicator names; texts generated by the backend (factors, recommendations) are English only.
 
 ## 3. Data we have
 
@@ -127,7 +146,7 @@ cd frontend && pnpm build                                                    # t
 |---|---|---|
 | `counties` | 42 (41 județe + București) | `code` (AB, CJ, B…), `name` (with diacritics), `region`, `nuts2` |
 | `regions` | 8 development regions (NUTS-2) | `name`, `nuts2` |
-| `communes` | 662 UATs in **AB, AR, BH, CJ, HD, MS, SB, VL** | `id` (e.g. `AB-0012`), `name`, `county`, `county_name`, `region` |
+| `communes` | 662 UATs in **AB, AR, BH, CJ, HD, MS, SB, VL** (the study area / AOI) | `id` (e.g. `AB-0012`), `name`, `county`, `county_name`, `region` |
 | `outline` | Romania polygon | |
 | `mask` | world minus Romania | used to hide everything outside |
 | `labels` | label points (polylabel) | `kind` region/county/commune, `name`, `code` |
@@ -138,13 +157,23 @@ cd frontend && pnpm build                                                    # t
 - **Commune `id`s are generated by sort order, not SIRUTA codes** — they are stable only while the build inputs are unchanged. If you need joins with INS/other data, add SIRUTA (OSM `ref:siruta`) to the pipeline.
 - Basemap: OpenFreeMap "liberty" (OSM planet build 2026-11-01). Hillshade: AWS terrarium DEM tiles. Attributions are on the map and in README — keep them.
 
-### NASA data — format (`backend/data/nasa/<dataset>.json`)
-```json
-{ "source": "NASA POWER (power.larc.nasa.gov)", "variable": "T2M_MAX", "unit": "°C",
-  "period": {"start": "2019-01-01", "end": "2025-12-31", "step": "month"},
-  "units": { "AB": {"2019-01": 2.1}, "AB-0012": {"2019-01": 1.8} } }
-```
-`units` keys = county `code` or commune `id`. **Always fill `source`** (transparency requirement). Raw datasets (NASA and supplementary) are downloaded to `backend/.cache/raw/` (gitignored). **Read `dataset.md` before touching data**: it lists every dataset's files, structure, units and quirks. Download scripts are in `backend/scripts/download/`.
+### Processed data (`backend/data/`, ~8 MB besides geo; built by `scripts/process/`)
+| File | Content |
+|---|---|
+| `units.json` | 670 analysis units: 8 AOI counties + 662 communes (id, name, county, area, point) |
+| `nasa/<dataset>.json` | monthly series per unit — compact `keys` + arrays; schema and list in `data/nasa/README.md` |
+| `derived/agro_yearly.json` | yearly crop-window indicators per unit (heat at maize flowering, June heat, wet small-grain flowering, late frost, harvest rain, dry spells, Apr–Sep P/ET/water balance, summer soil-moisture z-score) |
+| `soil/soilgrids.json` | SoilGrids 0–30 cm median + p10/p90 (SOC, pH, clay/sand/silt, N, bulk density, CEC) + USDA texture |
+| `crops/ins_stats.json` | INS area / production / yield per county (+ RO total), 2015–2025; grain-legume yield derived as production ÷ area |
+| `crops/cropmap.json` | EUCROPMAP 2018 / 2022 ha per class per unit (counted at 100 m) |
+| `crops/crop_traits.json` | hand-curated crop traits with references (FAO, Ecocrop, IPCC, Peoples 2009, Preissel 2015…) + scoring assumptions |
+
+- Gridded data → units: area-weighted overlap of grid cells (`scripts/process/common.py: grid_weights/aggregate`); rasters → units: commune label raster (`zonal.py`), counties = union of their communes.
+- Confidence convention: each dataset has `confidence.county` / `.commune` + a note; coarse grids (POWER ~50 km, GLDAS ~25 km) are "low" for communes.
+- Hazard thresholds (`app/scoring/hazards.py`): heat ones physiological; rain / wet-day / dry-spell ones ≈ regional 75th percentile 2015–2025. They are shown in the UI.
+- **Known gaps:** GLDAS 2015-01 raw file is a bad download (holds IMERG) → empty month; IMERG Final ends 2025-09; MODIS NDVI is only the Alba 2024 AppEEARS sample (`status: "sample"`) — when the full AppEEARS set lands in `.cache/raw/vegetation/...`, rerun `build_all.py ndvi`; other AppEEARS products (MOD16 ET, MOD11 LST, SMAP, ECOSTRESS, HLS) are not processed yet. Chickpea has no INS statistics (uses grain legumes as proxy, low confidence). EUCROPMAP county totals differ from INS by up to 30–50% → use INS for volumes.
+
+Raw datasets (NASA and supplementary) are downloaded to `backend/.cache/raw/` (gitignored). **Read `dataset.md` before touching raw data**: it lists every dataset's files, structure, units and quirks.
 
 ## 4. Conventions
 - Romanian names always with comma-below **ș ț** (not cedilla ş ţ), plus ă â î.

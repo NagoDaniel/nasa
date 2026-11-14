@@ -1,0 +1,407 @@
+{
+  "note": "Hand-curated literature values for Transylvanian conditions. Ranges, not measurements. Values marked 'approx' are approximate thresholds from agronomic literature and carry lower confidence. Refine with a local agronomist.",
+  "references": {
+    "FAO_BH86": "Brouwer C., Heibloem M. (1986). Irrigation Water Management: Irrigation Water Needs, Training Manual No. 3, FAO. Table 6: seasonal crop water needs.",
+    "FAO56": "Allen R.G. et al. (1998). Crop evapotranspiration, FAO Irrigation and Drainage Paper 56. Table 11 (stage lengths), Table 12 (Kc).",
+    "ECOCROP": "FAO Ecocrop database (optimal soil pH ranges).",
+    "PEOPLES09": "Peoples M.B. et al. (2009). The contributions of nitrogen-fixing crop legumes to the productivity of agricultural systems. Symbiosis 48: 1–17.",
+    "PREISSEL15": "Preissel S. et al. (2015). Magnitude and farm-economic value of grain legume pre-crop benefits in Europe. Field Crops Research 175: 64–79.",
+    "SEIFERT17": "Seifert C.A. et al. (2017). Continuous corn and soybean yield penalties across hundreds of thousands of fields. Agronomy Journal 109: 541–548.",
+    "IPCC19": "IPCC (2019). Refinement to the 2006 Guidelines, Vol. 4 Ch. 11: direct N2O emission factor EF1 = 0.01 kg N2O-N per kg N applied.",
+    "AR6": "IPCC AR6 WG1 (2021) Table 7.15: GWP100 of N2O = 273.",
+    "AGRO": "General agronomic literature for Central/Eastern Europe (sowing/harvest calendars, sensitive stages, rotation intervals); approximate."
+  },
+  "assumptions": {
+    "legume_precrop_yield_bonus": {
+      "value": 0.1,
+      "ref": "PREISSEL15",
+      "text": "Cereal after a grain legume: +10% yield (conservative; reported pre-crop effects are often 0.5–1.6 t/ha for wheat)."
+    },
+    "repeat_penalty": {
+      "value": 0.1,
+      "ref": "SEIFERT17",
+      "text": "Same crop in consecutive years: −10% yield (continuous-maize penalty used for all crops)."
+    },
+    "n2o_ef1": {
+      "value": 0.01,
+      "ref": "IPCC19"
+    },
+    "n2o_gwp100": {
+      "value": 273,
+      "ref": "AR6"
+    },
+    "n2o_n_to_n2o": {
+      "value": 1.5714,
+      "text": "44/28 mass ratio N2O / N2O-N"
+    }
+  },
+  "crops": {
+    "maize": {
+      "family": "cereal",
+      "season": "spring",
+      "winter_cover": false,
+      "legume": false,
+      "sowing": "Apr–May",
+      "harvest": "Sep–Oct",
+      "water_need_mm": [
+        500,
+        800
+      ],
+      "water_ref": "FAO_BH86",
+      "kc_mid": 1.2,
+      "kc_ref": "FAO56",
+      "sensitive": {
+        "stage": "flowering / silking",
+        "window": "Jul–Aug",
+        "hazards": [
+          "heat35_jul_aug",
+          "rootmoist_jja_z",
+          "dry_spell_apr_sep"
+        ],
+        "quality": "Heat + drought at flowering raise aflatoxin risk; wet harvest raises mould risk.",
+        "harvest_hazard": "rain_harvest_summer_crops"
+      },
+      "heat_threshold_c": 35,
+      "heat_ref": "AGRO (approx)",
+      "ph_opt": [
+        5.5,
+        7.5
+      ],
+      "ph_ref": "ECOCROP",
+      "n_fert_kg_ha": [
+        120,
+        180
+      ],
+      "n_ref": "AGRO (approx)",
+      "n_fixation_kg_ha": null,
+      "min_return_years": 1
+    },
+    "wheat": {
+      "family": "cereal",
+      "season": "winter",
+      "winter_cover": true,
+      "legume": false,
+      "sowing": "Oct",
+      "harvest": "Jul",
+      "water_need_mm": [
+        450,
+        650
+      ],
+      "water_ref": "FAO_BH86",
+      "kc_mid": 1.15,
+      "kc_ref": "FAO56",
+      "sensitive": {
+        "stage": "flowering (anthesis)",
+        "window": "late May–Jun",
+        "hazards": [
+          "rain_flowering_small_grain",
+          "wet_days_flowering_small_grain"
+        ],
+        "quality": "Wet, humid flowering raises Fusarium head blight / DON mycotoxin risk; rain at harvest lowers quality.",
+        "harvest_hazard": "rain_harvest_small_grain"
+      },
+      "heat_threshold_c": 32,
+      "heat_ref": "AGRO (approx)",
+      "ph_opt": [
+        6.0,
+        7.5
+      ],
+      "ph_ref": "ECOCROP",
+      "n_fert_kg_ha": [
+        100,
+        160
+      ],
+      "n_ref": "AGRO (approx)",
+      "n_fixation_kg_ha": null,
+      "min_return_years": 1
+    },
+    "barley": {
+      "family": "cereal",
+      "season": "winter",
+      "winter_cover": true,
+      "legume": false,
+      "sowing": "Oct (winter) / Mar (spring)",
+      "harvest": "late Jun–Jul",
+      "water_need_mm": [
+        450,
+        650
+      ],
+      "water_ref": "FAO_BH86 (wheat value; FAO-56 groups barley, oats and wheat)",
+      "kc_mid": 1.15,
+      "kc_ref": "FAO56",
+      "sensitive": {
+        "stage": "flowering",
+        "window": "May–Jun",
+        "hazards": [
+          "rain_flowering_small_grain",
+          "wet_days_flowering_small_grain"
+        ],
+        "quality": "Wet flowering raises Fusarium / mycotoxin risk; rain at harvest causes sprouting.",
+        "harvest_hazard": "rain_harvest_small_grain"
+      },
+      "heat_threshold_c": 32,
+      "heat_ref": "AGRO (approx)",
+      "ph_opt": [
+        6.0,
+        7.5
+      ],
+      "ph_ref": "ECOCROP",
+      "n_fert_kg_ha": [
+        80,
+        120
+      ],
+      "n_ref": "AGRO (approx)",
+      "n_fixation_kg_ha": null,
+      "min_return_years": 1
+    },
+    "oats": {
+      "family": "cereal",
+      "season": "spring",
+      "winter_cover": false,
+      "legume": false,
+      "sowing": "Mar–Apr",
+      "harvest": "Jul–Aug",
+      "water_need_mm": [
+        450,
+        650
+      ],
+      "water_ref": "FAO_BH86 (wheat value; FAO-56 groups barley, oats and wheat)",
+      "kc_mid": 1.15,
+      "kc_ref": "FAO56",
+      "sensitive": {
+        "stage": "flowering (panicle)",
+        "window": "Jun",
+        "hazards": [
+          "rain_flowering_small_grain",
+          "wet_days_flowering_small_grain",
+          "heat30_jun"
+        ],
+        "quality": "Wet flowering raises Fusarium / mycotoxin risk; oats tolerate acid soils better than other cereals.",
+        "harvest_hazard": "rain_harvest_small_grain"
+      },
+      "heat_threshold_c": 32,
+      "heat_ref": "AGRO (approx)",
+      "ph_opt": [
+        5.5,
+        7.0
+      ],
+      "ph_ref": "ECOCROP",
+      "n_fert_kg_ha": [
+        60,
+        100
+      ],
+      "n_ref": "AGRO (approx)",
+      "n_fixation_kg_ha": null,
+      "min_return_years": 2
+    },
+    "pea": {
+      "family": "legume",
+      "season": "spring",
+      "winter_cover": false,
+      "legume": true,
+      "sowing": "Mar",
+      "harvest": "Jul",
+      "water_need_mm": [
+        350,
+        500
+      ],
+      "water_ref": "FAO_BH86",
+      "kc_mid": 1.15,
+      "kc_ref": "FAO56",
+      "sensitive": {
+        "stage": "flowering / pod set",
+        "window": "late May–Jun",
+        "hazards": [
+          "heat30_jun",
+          "dry_spell_apr_sep"
+        ],
+        "quality": "Heat (> ~30 °C) and drought at flowering cut pod set; rain at harvest lowers seed quality.",
+        "harvest_hazard": "rain_harvest_small_grain"
+      },
+      "heat_threshold_c": 30,
+      "heat_ref": "AGRO (approx)",
+      "ph_opt": [
+        6.0,
+        7.5
+      ],
+      "ph_ref": "ECOCROP",
+      "n_fert_kg_ha": [
+        0,
+        30
+      ],
+      "n_ref": "AGRO (approx)",
+      "n_fixation_kg_ha": [
+        50,
+        150
+      ],
+      "n_fix_ref": "PEOPLES09",
+      "min_return_years": 4
+    },
+    "chickpea": {
+      "family": "legume",
+      "season": "spring",
+      "winter_cover": false,
+      "legume": true,
+      "sowing": "Mar–Apr",
+      "harvest": "Jul–Aug",
+      "water_need_mm": [
+        300,
+        450
+      ],
+      "water_ref": "approx (not in FAO_BH86; drought-tolerant pulse, FAO56 Kc 1.00 × short season)",
+      "kc_mid": 1.0,
+      "kc_ref": "FAO56",
+      "sensitive": {
+        "stage": "flowering / pod fill",
+        "window": "Jun–Jul",
+        "hazards": [
+          "late_frost",
+          "rain_flowering_small_grain"
+        ],
+        "quality": "Wet, humid weather favours Ascochyta blight; late frost damages seedlings.",
+        "harvest_hazard": "rain_harvest_small_grain"
+      },
+      "heat_threshold_c": 35,
+      "heat_ref": "AGRO (approx)",
+      "ph_opt": [
+        6.0,
+        8.0
+      ],
+      "ph_ref": "ECOCROP",
+      "n_fert_kg_ha": [
+        0,
+        30
+      ],
+      "n_ref": "AGRO (approx)",
+      "n_fixation_kg_ha": [
+        40,
+        120
+      ],
+      "n_fix_ref": "PEOPLES09",
+      "min_return_years": 4,
+      "data_note": "No Romanian county statistics for chickpea; yield uses INS 'grain legumes' as a proxy (low confidence)."
+    },
+    "soy": {
+      "family": "legume",
+      "season": "spring",
+      "winter_cover": false,
+      "legume": true,
+      "sowing": "Apr–May",
+      "harvest": "Sep–Oct",
+      "water_need_mm": [
+        450,
+        700
+      ],
+      "water_ref": "FAO_BH86",
+      "kc_mid": 1.15,
+      "kc_ref": "FAO56",
+      "sensitive": {
+        "stage": "flowering / pod fill",
+        "window": "Jul–Aug",
+        "hazards": [
+          "heat32_jul_aug",
+          "rootmoist_jja_z"
+        ],
+        "quality": "Drought at pod fill cuts yield and protein; wet harvest lowers quality.",
+        "harvest_hazard": "rain_harvest_summer_crops"
+      },
+      "heat_threshold_c": 35,
+      "heat_ref": "AGRO (approx)",
+      "ph_opt": [
+        6.0,
+        7.5
+      ],
+      "ph_ref": "ECOCROP",
+      "n_fert_kg_ha": [
+        0,
+        30
+      ],
+      "n_ref": "AGRO (approx)",
+      "n_fixation_kg_ha": [
+        80,
+        200
+      ],
+      "n_fix_ref": "PEOPLES09",
+      "min_return_years": 2
+    },
+    "sunflower": {
+      "family": "oilseed (Asteraceae)",
+      "season": "spring",
+      "winter_cover": false,
+      "legume": false,
+      "sowing": "Apr",
+      "harvest": "Aug–Sep",
+      "water_need_mm": [
+        600,
+        1000
+      ],
+      "water_ref": "FAO_BH86",
+      "kc_mid": 1.05,
+      "kc_ref": "FAO56 (1.0–1.15)",
+      "sensitive": {
+        "stage": "flowering / seed fill",
+        "window": "Jul–Aug",
+        "hazards": [
+          "heat35_jul_aug",
+          "rootmoist_jja_z"
+        ],
+        "quality": "Deep roots make it drought-tolerant, but heat at flowering lowers oil content; wet late summer favours Sclerotinia head rot.",
+        "harvest_hazard": "rain_harvest_summer_crops"
+      },
+      "heat_threshold_c": 35,
+      "heat_ref": "AGRO (approx)",
+      "ph_opt": [
+        6.0,
+        7.5
+      ],
+      "ph_ref": "ECOCROP",
+      "n_fert_kg_ha": [
+        60,
+        100
+      ],
+      "n_ref": "AGRO (approx)",
+      "n_fixation_kg_ha": null,
+      "min_return_years": 4
+    },
+    "flax": {
+      "family": "oilseed (Linaceae)",
+      "season": "spring",
+      "winter_cover": false,
+      "legume": false,
+      "sowing": "Mar–Apr",
+      "harvest": "Aug",
+      "water_need_mm": [
+        400,
+        600
+      ],
+      "water_ref": "approx (not in FAO_BH86; FAO56 Kc 1.10)",
+      "kc_mid": 1.1,
+      "kc_ref": "FAO56",
+      "sensitive": {
+        "stage": "flowering",
+        "window": "Jun–Jul",
+        "hazards": [
+          "heat30_jun",
+          "dry_spell_apr_sep"
+        ],
+        "quality": "Heat and drought at flowering lower seed set and oil content.",
+        "harvest_hazard": "rain_harvest_summer_crops"
+      },
+      "heat_threshold_c": 32,
+      "heat_ref": "AGRO (approx)",
+      "ph_opt": [
+        5.5,
+        7.0
+      ],
+      "ph_ref": "ECOCROP",
+      "n_fert_kg_ha": [
+        40,
+        80
+      ],
+      "n_ref": "AGRO (approx)",
+      "n_fixation_kg_ha": null,
+      "min_return_years": 5,
+      "data_note": "Oil flax is grown on very small areas in the region; INS figures are sparse."
+    }
+  }
+}
