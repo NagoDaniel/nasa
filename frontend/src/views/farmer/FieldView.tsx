@@ -7,7 +7,6 @@ import type { CellDataset, FieldContextResp, FieldMeasure, SavedField, SoilConte
 import Chart, { type ChartOption } from '../../components/Chart'
 import Collapsible from '../../components/Collapsible'
 import { fmt } from '../../components/format'
-import Info from '../../components/Info'
 import { useI18n } from '../../i18n'
 import { fromPolygon, ringAreaHa, toPolygon, type DrawMode } from '../../map/draw'
 import { useFieldLink } from '../../state/FieldLink'
@@ -243,6 +242,20 @@ export default function FieldView({ active }: { active: boolean }) {
 }
 
 // ----------------------------------------------------------------------------- vegetation
+function vegSummary(F: FieldText, job: VegJob | null): string {
+  if (!job) return F.notLoaded
+  if (job.status === 'queued' || job.status === 'running') {
+    const p = job.progress.total ? Math.round((100 * job.progress.done) / job.progress.total) : 0
+    return F.loadingPct.replace('{p}', String(p))
+  }
+  if (job.status === 'error') return F.st_error
+  const parts = (['hls', 's2'] as const).flatMap((k) => {
+    const lc = job.result?.sources[k]?.latest_clear
+    return lc?.ndvi ? [`${k === 'hls' ? 'HLS' : 'S2'} ${fmt(lc.ndvi.median, 2)}`] : []
+  })
+  return parts.length ? `NDVI ${parts.join(' · ')}` : F.none
+}
+
 function Vegetation({ F, job, jobErr, onLoad, shown, setShown }: {
   F: FieldText
   job: VegJob | null
@@ -254,36 +267,34 @@ function Vegetation({ F, job, jobErr, onLoad, shown, setShown }: {
   const r = job?.result
   const running = job && (job.status === 'queued' || job.status === 'running')
   return (
-    <Collapsible id="field-veg" title={F.measuredTitle} defaultOpen
+    <Collapsible id="field-veg" title={F.measuredTitle} summary={vegSummary(F, job)}
       info={<>{F.measuredSub} NDVI = (NIR − Red) / (NIR + Red): bare soil ≈ 0.1–0.2, dense green crops ≈ 0.7–0.9.</>}>
-      <div className="stack">
-        <p className="muted small"><span className="badge kind-measured">{F.measured}</span> {F.measuredSub}</p>
-        {!job && (
-          <div className="stack">
-            <button type="button" className="primary" onClick={onLoad}>{F.loadVeg}</button>
-            <p className="muted small">{F.loadVegNote}</p>
-          </div>
-        )}
-        {jobErr && <p className="note warn small">{jobErr}</p>}
-        {job?.status === 'error' && (
-          <p className="note warn small">{job.error} <button type="button" className="link" onClick={onLoad}>{F.retry}</button></p>
-        )}
-        {running && (
-          <div className="field-progress">
-            <div className="small">{job.stage === 'reading pixels' ? F.reading : job.stage} · {job.progress.done}/{job.progress.total || '…'}</div>
-            <div className="bar"><i style={{ width: `${job.progress.total ? (100 * job.progress.done) / job.progress.total : 5}%` }} /></div>
-          </div>
-        )}
-        {r && (
-          <>
-            <p className="muted tiny">{r.index}. {F.fetched}: {r.fetched_at.replace('T', ' ')} UTC · {r.season.start} – {r.season.end}</p>
-            {(['hls', 's2'] as const).map((k) => r.sources[k] ? (
-              <SourceBlock key={k} F={F} k={k} s={r.sources[k]!} pending={r.pending.includes(k)} shown={shown === k}
-                toggle={() => setShown(shown === k ? null : k)} rules={r.status_rules} />
-            ) : r.pending.includes(k) ? <p key={k} className="muted small">{k.toUpperCase()}: {F.pendingSource}</p> : null)}
-          </>
-        )}
-      </div>
+      <p className="muted small"><span className="badge kind-measured">{F.measured}</span> {F.measuredSub}</p>
+      {!job && (
+        <div className="stack">
+          <button type="button" className="primary" onClick={onLoad}>{F.loadVeg}</button>
+          <p className="muted small">{F.loadVegNote}</p>
+        </div>
+      )}
+      {jobErr && <p className="note warn small">{jobErr}</p>}
+      {job?.status === 'error' && (
+        <p className="note warn small">{job.error} <button type="button" className="link" onClick={onLoad}>{F.retry}</button></p>
+      )}
+      {running && (
+        <div className="field-progress">
+          <div className="small">{job.stage === 'reading pixels' ? F.reading : job.stage} · {job.progress.done}/{job.progress.total || '…'}</div>
+          <div className="bar"><i style={{ width: `${job.progress.total ? (100 * job.progress.done) / job.progress.total : 5}%` }} /></div>
+        </div>
+      )}
+      {r && (
+        <>
+          <p className="muted tiny">{r.index}. {F.fetched}: {r.fetched_at.replace('T', ' ')} UTC · {r.season.start} – {r.season.end}</p>
+          {(['hls', 's2'] as const).map((k) => r.sources[k] ? (
+            <SourceBlock key={k} F={F} k={k} s={r.sources[k]!} pending={r.pending.includes(k)} shown={shown === k}
+              toggle={() => setShown(shown === k ? null : k)} rules={r.status_rules} />
+          ) : r.pending.includes(k) ? <p key={k} className="muted small">{k.toUpperCase()}: {F.pendingSource}</p> : null)}
+        </>
+      )}
     </Collapsible>
   )
 }
@@ -297,21 +308,23 @@ function SourceBlock({ F, k, s, pending, shown, toggle, rules }: {
   toggle: () => void
   rules: Record<string, string>
 }) {
-  const title = s.short ?? (k === 'hls' ? 'HLS' : 'Sentinel-2')
+  const name = s.short ?? (k === 'hls' ? 'HLS' : 'Sentinel-2')
+  const title = <>{name} · {s.resolution_m ?? (k === 'hls' ? 30 : 10)} m {s.status === 'ok' && !s.nasa && <span className="badge">{F.notNasa}</span>}</>
   if (s.status !== 'ok') {
-    return <div className="field-src"><h4>{title}</h4><p className="note warn small">{s.note}</p></div>
+    return (
+      <Collapsible id={`field-src-${k}`} title={title} summary={F.st_error}>
+        <p className="note warn small">{s.note}</p>
+      </Collapsible>
+    )
   }
   const obs = s.observations ?? []
   const lc = s.latest_clear
   const c = s.counts ?? {}
+  const peaks = s.peaks ?? []
   return (
-    <div className="field-src">
-      <div className="field-src-head">
-        <h4>{title} {!s.nasa && <span className="badge">{F.notNasa}</span>}</h4>
-        <span className="muted small">{s.resolution_m} m {F.pixelSize}</span>
-      </div>
+    <Collapsible id={`field-src-${k}`} title={title} info={<>{s.label}. {s.cloud_mask}.</>}
+      summary={pending ? F.pendingSource : lc?.ndvi ? `NDVI ${fmt(lc.ndvi.median, 2)} · ${lc.date}` : F.none}>
       <p className="muted tiny">{s.label} · {s.cloud_mask}</p>
-      {pending && <p className="muted small">{F.pendingSource}</p>}
       {lc ? (
         <div className="field-latest">
           <div>
@@ -331,13 +344,17 @@ function SourceBlock({ F, k, s, pending, shown, toggle, rules }: {
         <Count n={c.no_data} label={F.nodataN} st="no_data" info={rules.no_data} />
         <Count n={c.error} label={F.errorN} st="error" info={rules.error} />
       </div>
-      {obs.length > 0 && <SeasonChart F={F} obs={obs} />}
-      {!!s.peaks?.length && (
-        <div>
-          <div className="small"><b>{F.peaks}</b> <Info>{F.peaksNote}</Info></div>
+      {obs.length > 0 && (
+        <Collapsible id={`field-src-${k}-chart`} title={F.seasonChart} summary={`${obs.length} ${F.imagesN}`}>
+          <SeasonChart F={F} obs={obs} />
+        </Collapsible>
+      )}
+      {peaks.length > 0 && (
+        <Collapsible id={`field-src-${k}-peaks`} title={F.peaks} info={F.peaksNote}
+          summary={`${peaks[0].year}–${peaks[peaks.length - 1].year}`}>
           <table className="field-table small">
             <tbody>
-              {s.peaks.map((p) => (
+              {peaks.map((p) => (
                 <tr key={p.year}>
                   <td>{p.year}</td>
                   <td>{p.value !== null ? <b>{fmt(p.value, 2)}</b> : <span className="muted">{p.status === 'cloudy' ? F.st_cloudy : F.st_no_data}</span>}</td>
@@ -346,10 +363,9 @@ function SourceBlock({ F, k, s, pending, shown, toggle, rules }: {
               ))}
             </tbody>
           </table>
-        </div>
+        </Collapsible>
       )}
-      <details>
-        <summary className="small">{F.observations} ({obs.length})</summary>
+      <Collapsible id={`field-src-${k}-obs`} title={F.observations} summary={`${obs.length}`}>
         <div className="field-table-wrap">
           <table className="field-table tiny">
             <thead><tr><th>{F.date}</th><th>{F.sensor}</th><th>{F.status}</th><th>NDVI</th><th>{F.clearPx}</th><th>{F.sceneCloud}</th></tr></thead>
@@ -367,8 +383,8 @@ function SourceBlock({ F, k, s, pending, shown, toggle, rules }: {
             </tbody>
           </table>
         </div>
-      </details>
-    </div>
+      </Collapsible>
+    </Collapsible>
   )
 }
 
@@ -417,6 +433,14 @@ function latestYear(c: { yearly?: Record<string, number> }): [string, number] | 
 }
 const unitFor = (d: CellDataset) => (d.aggregation === 'sum' ? `${d.unit}/yr` : d.unit)
 
+function cellSummary(d: CellDataset): string {
+  const ok = d.cells.filter((c) => c.status === 'ok')
+  if (!ok.length) return '–'
+  if (d.cells.length > 1) return `${d.cells.length} cells`
+  const ly = latestYear(ok[0])
+  return ly ? `${fmt(ly[1], 1)} ${unitFor(d)} (${ly[0]})` : '–'
+}
+
 function Coarse({ F, ctx, shown, setShown, onFit, fieldBbox }: {
   F: FieldText
   ctx: FieldContextResp
@@ -437,45 +461,39 @@ function Coarse({ F, ctx, shown, setShown, onFit, fieldBbox }: {
   }
   return (
     <>
-      <Collapsible id="field-coarse" title={F.coarseTitle} defaultOpen info={F.coarseSub}>
-        <div className="stack">
-          <p className="note small field-estimate-note"><span className="badge kind-estimate">{F.estimate}</span> {F.coarseSub}</p>
-          {ctx.cells.map((d) => (
-            <div key={d.dataset} className="field-cell">
-              <div className="field-src-head">
-                <h4>{d.label}</h4>
-                <span className="muted small">{d.resolution}</span>
-              </div>
-              <p className="muted tiny">{d.about} {F.source}: {d.source}. {F.period}: {d.period.start} – {d.period.end}.</p>
-              {d.cells.length > 1 && <p className="small">{F.spansCells.replace('{n}', String(d.cells.length))}</p>}
-              {d.cells.map((c) => {
-                const ly = latestYear(c)
-                const on = shown.cell?.dataset === d.dataset && shown.cell.cell === c.cell
-                return (
-                  <div key={c.cell} className="field-cell-row">
-                    <div>
-                      {c.status === 'no_data' ? <span className="muted">{F.st_no_data}</span> : (
-                        <>
-                          <div>{F.latestYear}: <b>{ly ? `${fmt(ly[1], 1)} ${unitFor(d)}` : '–'}</b>{ly && <span className="muted"> ({ly[0]})</span>}</div>
-                          {c.latest_month && <div className="small">{F.latestMonth}: {fmt(c.latest_month.value, 1)} {d.unit} <span className="muted">({c.latest_month.month})</span></div>}
-                        </>
-                      )}
-                      <div className="muted tiny">
-                        {F.cellOf} ≈ {fmt(c.cell_area_km2, 0)} km² · {F.fieldIsOfCell.replace('{p}', c.field_share_of_cell_pct !== null ? fmt(c.field_share_of_cell_pct, c.field_share_of_cell_pct < 0.01 ? 4 : 2) : '–')}
-                        {d.cells.length > 1 && ` · ${fmt(c.share_of_field_pct, 0)}% of field`}
-                        {!!c.missing_months && ` · ${c.missing_months} ${F.missing}`}
-                      </div>
+      <Collapsible id="field-coarse" title={F.coarseTitle} info={F.coarseSub} summary={F.datasetsN.replace('{n}', String(ctx.cells.length))}>
+        <p className="note small field-estimate-note"><span className="badge kind-estimate">{F.estimate}</span> {F.coarseSub}</p>
+        {ctx.cells.map((d) => (
+          <Collapsible key={d.dataset} id={`field-cell-${d.dataset}`} title={d.label} summary={cellSummary(d)}>
+            <p className="muted tiny">{d.resolution}. {d.about} {F.source}: {d.source}. {F.period}: {d.period.start} – {d.period.end}.</p>
+            {d.cells.length > 1 && <p className="small">{F.spansCells.replace('{n}', String(d.cells.length))}</p>}
+            {d.cells.map((c) => {
+              const ly = latestYear(c)
+              const on = shown.cell?.dataset === d.dataset && shown.cell.cell === c.cell
+              return (
+                <div key={c.cell} className="field-cell-row">
+                  <div>
+                    {c.status === 'no_data' ? <span className="muted">{F.st_no_data}</span> : (
+                      <>
+                        <div>{F.latestYear}: <b>{ly ? `${fmt(ly[1], 1)} ${unitFor(d)}` : '–'}</b>{ly && <span className="muted"> ({ly[0]})</span>}</div>
+                        {c.latest_month && <div className="small">{F.latestMonth}: {fmt(c.latest_month.value, 1)} {d.unit} <span className="muted">({c.latest_month.month})</span></div>}
+                      </>
+                    )}
+                    <div className="muted tiny">
+                      {F.cellOf} ≈ {fmt(c.cell_area_km2, 0)} km² · {F.fieldIsOfCell.replace('{p}', c.field_share_of_cell_pct !== null ? fmt(c.field_share_of_cell_pct, c.field_share_of_cell_pct < 0.01 ? 4 : 2) : '–')}
+                      {d.cells.length > 1 && ` · ${fmt(c.share_of_field_pct, 0)}% of field`}
+                      {!!c.missing_months && ` · ${c.missing_months} ${F.missing}`}
                     </div>
-                    <button type="button" className={`chip ${on ? 'on' : ''}`} onClick={() => toggleCell(d.dataset, c.cell, c.geometry.coordinates)}>
-                      {on ? F.hideCell : F.showCell}
-                    </button>
                   </div>
-                )
-              })}
-            </div>
-          ))}
-          {shown.cell && <button type="button" className="link" onClick={() => { setShown((s) => ({ ...s, cell: null })); onFit(fieldBbox) }}>← {F.backToField}</button>}
-        </div>
+                  <button type="button" className={`chip ${on ? 'on' : ''}`} onClick={() => toggleCell(d.dataset, c.cell, c.geometry.coordinates)}>
+                    {on ? F.hideCell : F.showCell}
+                  </button>
+                </div>
+              )
+            })}
+          </Collapsible>
+        ))}
+        {shown.cell && <button type="button" className="link" onClick={() => { setShown((s) => ({ ...s, cell: null })); onFit(fieldBbox) }}>← {F.backToField}</button>}
       </Collapsible>
       <SoilBlock F={F} soil={ctx.soil} shown={shown.soil} toggle={() => setShown((s) => ({ ...s, soil: !s.soil }))} />
       {ctx.smap && <SmapBlock F={F} smap={ctx.smap} />}
@@ -485,46 +503,44 @@ function Coarse({ F, ctx, shown, setShown, onFit, fieldBbox }: {
 
 function SoilBlock({ F, soil, shown, toggle }: { F: FieldText; soil: SoilContext; shown: boolean; toggle: () => void }) {
   const px = soil.pixels
+  const v = soil.values ?? {}
+  const summary = soil.status !== 'ok' ? F.st_no_data
+    : [v.phh2o && `pH ${fmt(v.phh2o.mean, 1)}`, v.soc && `SOC ${fmt(v.soc.mean, 1)} g/kg`].filter(Boolean).join(' · ')
   return (
-    <Collapsible id="field-soil" title={F.soilTitle} info={soil.note}>
-      <div className="stack">
-        <p className="muted small"><span className="badge kind-model">{F.model}</span> {soil.note}</p>
-        {px && (
-          <div className="field-latest">
-            <span className="small">{F.soilPixels.replace('{n}', String(px.count)).replace('{a}', fmt(px.pixel_area_ha, 1))} ({px.pixel_size_m[0]} × {px.pixel_size_m[1]} m) · {px.selection}</span>
-            <button type="button" className={`chip ${shown ? 'on' : ''}`} onClick={toggle}>{shown ? F.hidePixels : F.showPixels}</button>
-          </div>
-        )}
-        {soil.status === 'ok' && soil.values && (
-          <table className="field-table small">
-            <tbody>
-              {Object.entries(soil.values).map(([k, v]) => (
-                <tr key={k}>
-                  <td>{soil.properties[k]?.label}</td>
-                  <td><b>{v ? fmt(v.mean, k === 'phh2o' ? 1 : 1) : '–'}</b> {soil.properties[k]?.unit === 'pH' ? '' : soil.properties[k]?.unit}</td>
-                  <td className="muted">{v && v.min !== v.max ? `${fmt(v.min, 1)}–${fmt(v.max, 1)}` : ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <p className="muted tiny">{F.source}: {soil.source}. {F.resolution}: {soil.resolution ?? '250 m'}.</p>
-      </div>
+    <Collapsible id="field-soil" title={F.soilTitle} info={soil.note} summary={summary}>
+      <p className="muted small"><span className="badge kind-model">{F.model}</span> {soil.note}</p>
+      {px && (
+        <div className="field-latest">
+          <span className="small">{F.soilPixels.replace('{n}', String(px.count)).replace('{a}', fmt(px.pixel_area_ha, 1))} ({px.pixel_size_m[0]} × {px.pixel_size_m[1]} m) · {px.selection}</span>
+          <button type="button" className={`chip ${shown ? 'on' : ''}`} onClick={toggle}>{shown ? F.hidePixels : F.showPixels}</button>
+        </div>
+      )}
+      {soil.status === 'ok' && soil.values && (
+        <table className="field-table small">
+          <tbody>
+            {Object.entries(soil.values).map(([k, val]) => (
+              <tr key={k}>
+                <td>{soil.properties[k]?.label}</td>
+                <td><b>{val ? fmt(val.mean, 1) : '–'}</b> {soil.properties[k]?.unit === 'pH' ? '' : soil.properties[k]?.unit}</td>
+                <td className="muted">{val && val.min !== val.max ? `${fmt(val.min, 1)}–${fmt(val.max, 1)}` : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <p className="muted tiny">{F.source}: {soil.source}. {F.resolution}: {soil.resolution ?? '250 m'}.</p>
     </Collapsible>
   )
 }
 
 function SmapBlock({ F, smap }: { F: FieldText; smap: SmapContext }) {
+  const lm = smap.status === 'ok' ? smap.latest_month : null
   return (
-    <Collapsible id="field-smap" title={F.smapTitle} info={smap.note}>
-      <div className="stack">
-        <p className="muted small"><span className="badge kind-estimate">{F.communeAvg}</span> {smap.note}</p>
-        {smap.status === 'ok' && smap.latest_month && (
-          <div>{F.latestMonth}: <b>{fmt(smap.latest_month.value, 3)} {smap.unit}</b> <span className="muted">({smap.latest_month.month})</span></div>
-        )}
-        <p className="muted tiny">{F.source}: {smap.source}. {F.resolution}: {smap.resolution}.</p>
-      </div>
+    <Collapsible id="field-smap" title={F.smapTitle} info={smap.note}
+      summary={lm ? `${fmt(lm.value, 3)} ${smap.unit} (${lm.month})` : F.st_no_data}>
+      <p className="muted small"><span className="badge kind-estimate">{F.communeAvg}</span> {smap.note}</p>
+      {lm && <div>{F.latestMonth}: <b>{fmt(lm.value, 3)} {smap.unit}</b> <span className="muted">({lm.month})</span></div>}
+      <p className="muted tiny">{F.source}: {smap.source}. {F.resolution}: {smap.resolution}.</p>
     </Collapsible>
   )
 }
-
