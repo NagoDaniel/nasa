@@ -57,7 +57,7 @@ export const ro: Dict = {
   presets: 'Exemple',
   scoring: 'Se calculează…',
   aiTitle: 'Asistent AI',
-  aiBody: 'Rolul AI (prognoză, clasificarea riscului sau explicații) nu este încă definit. Nimic de pe această pagină nu este generat de AI.',
+  aiBody: 'Asistentul (butonul de chat de pe hartă) explică cifrele din acest panou și mută harta pentru dvs. Citește doar datele proiectului, nu face prognoze și poate greși — verificați cifrele aici.',
   procTitle: 'Perspectiva aprovizionării pe județe',
   procSub: 'Rezultatele din câmp agregate pe județ pentru ingredientul ales.',
   ingredient: 'Ingredient',

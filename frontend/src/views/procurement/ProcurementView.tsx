@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getProcurement } from '../../api/client'
 import type { ProcurementResponse } from '../../api/types'
 import Chart, { PALETTE, type ChartOption } from '../../components/Chart'
@@ -31,9 +31,18 @@ export default function ProcurementView({ section, selectedCounty, active }: {
   active: boolean
 }) {
   const { t, lang } = useI18n()
-  const { setCustomLayer } = useMapLink()
+  const { setCustomLayer, command } = useMapLink()
   const [crop, setCrop] = useState('maize')
   const [metric, setMetric] = useState<Metric>('availability')
+
+  // Assistant: pick the ingredient crop (and score) shown here.
+  const applied = useRef(0)
+  useEffect(() => {
+    if (!command || command.type !== 'procurement' || command.seq === applied.current) return
+    applied.current = command.seq
+    setCrop(command.crop)
+    if (command.metric) setMetric(command.metric)
+  }, [command])
   const res = useAsync(crop, () => getProcurement(crop))
   const d = res.data && res.data.crop === crop ? res.data : null
 

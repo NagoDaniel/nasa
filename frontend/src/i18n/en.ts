@@ -59,7 +59,7 @@ export const en = {
   presets: 'Presets',
   scoring: 'Scoring…',
   aiTitle: 'AI assistant',
-  aiBody: 'The AI role (forecasting, risk classification or an explainer) is not defined yet. Nothing on this page is AI-generated.',
+  aiBody: 'The assistant (chat button on the map) explains the numbers on this dashboard and moves the map for you. It only reads this project’s data, does not forecast, and can be wrong — check figures here.',
   // procurement
   procTitle: 'Sourcing outlook by county',
   procSub: 'Field results aggregated per county for the chosen pet-food ingredient.',

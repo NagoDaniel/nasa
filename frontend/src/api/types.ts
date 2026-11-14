@@ -148,3 +148,28 @@ export type Terrain = {
     landcover_pct?: Record<string, number>
   }
 }
+
+// ---------- assistant ----------
+export type AssistantAction =
+  | { type: 'select_area'; unit_id: string }
+  | { type: 'open_section'; section: string }
+  | { type: 'color_map'; kind: 'indicator' | 'agro' | 'soil' | 'cropshare'; key: string; year?: string | null }
+  | { type: 'set_procurement_crop'; crop: string; metric?: 'availability' | 'quality' | 'impact' | null }
+
+export type AssistantChoice = { id: string; name: string; kind: string; county_name: string }
+
+export type ChatResponse = {
+  reply: string
+  sig: string
+  mode: 'rule' | 'llm' | 'refused' | 'limited' | 'offline'
+  actions: AssistantAction[]
+  choices: AssistantChoice[]
+  sources: string[]
+  unverified: string[]
+}
+
+export type ChatTurn = { role: 'user' | 'assistant'; text: string; sig?: string }
+
+export type ChatContext = { unit_id: string | null; role: 'farmer' | 'procurement'; section: string; lang: 'en' | 'ro' }
+
+export type AssistantStatus = { llm: boolean; max_chars: number; limits: { per_minute: number; per_day: number }; llm_available_today: boolean }
