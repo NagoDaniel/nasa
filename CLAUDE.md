@@ -144,7 +144,7 @@ cd frontend && pnpm build                                                    # t
   "period": {"start": "2019-01-01", "end": "2025-12-31", "step": "month"},
   "units": { "AB": {"2019-01": 2.1}, "AB-0012": {"2019-01": 1.8} } }
 ```
-`units` keys = county `code` or commune `id`. **Always fill `source`** (transparency requirement). No NASA datasets are downloaded yet — that's the next step; NASA POWER needs no account, others need Earthdata login.
+`units` keys = county `code` or commune `id`. **Always fill `source`** (transparency requirement). Raw datasets (NASA and supplementary) are downloaded to `backend/.cache/raw/` (gitignored). **Read `dataset.md` before touching data**: it lists every dataset's files, structure, units and quirks. Download scripts are in `backend/scripts/download/`.
 
 ## 4. Conventions
 - Romanian names always with comma-below **ș ț** (not cedilla ş ţ), plus ă â î.

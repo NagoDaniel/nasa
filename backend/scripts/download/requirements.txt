@@ -1,0 +1,10 @@
+requests
+shapely
+rasterio
+xarray
+netCDF4
+h5netcdf
+h5py
+numpy
+pandas
+earthaccess
