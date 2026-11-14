@@ -1,23 +1,26 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import {
   AttributionControl,
   Map as MlMap,
   NavigationControl,
   ScaleControl,
-  type MapGeoJSONFeature,
   type ExpressionSpecification,
   type LngLatBoundsLike,
-  type MapLayerMouseEvent,
+  type MapGeoJSONFeature,
+  type MapMouseEvent,
   type StyleSpecification,
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { scoreColor } from '../components/format'
-import Info from '../components/Info'
+import { fmt } from '../components/format'
+import type { ResolvedLayer } from '../state/MapLink'
 import { countyColorExpression } from './regionColors'
+import { NO_DATA, digitsFor } from './scales'
 import {
+  AOI,
   BASEMAP_URL,
-  CHOROPLETH_OPACITY,
+  COMMUNE_OPACITY,
   COUNTY_OPACITY,
+  DATA_OPACITY,
   HIDDEN_BASEMAP_LAYERS,
   RO_BOUNDS,
   RO_MAX_BOUNDS,
@@ -28,32 +31,53 @@ import {
   topLayers,
 } from './style'
 
-export type AreaSelection =
-  | { kind: 'county'; code: string; name: string; region: string; nuts2: string }
-  | { kind: 'commune'; id: string; name: string; county: string; countyName: string; region: string }
-
-export type Choropleth = { values: Record<string, number | null>; label: string } | null
-
-type Props = {
-  onSelect?: (sel: AreaSelection | null) => void
-  initialCounty?: string
-  initialBounds?: LngLatBoundsLike
-  choropleth?: Choropleth
-  legendLow?: string
-  legendHigh?: string
-  legendInfo?: ReactNode
+export type MapPick = {
+  id: string
+  kind: 'county' | 'commune'
+  name: string
+  county: string
+  countyName: string
+  inAoi: boolean
 }
 
-const BUCKETS = [15, 40, 60, 85]
+export type MapHandle = { flyTo: (center: [number, number], zoom: number) => void }
 
-type FeatureRef = { source: 'counties' | 'communes'; id: string | number }
+type Props = {
+  /** Selected area id (county code or commune id); the map only displays it. */
+  selectedId: string | null
+  onSelect?: (pick: MapPick) => void
+  /** Area to outline (e.g. the table row under the mouse). */
+  highlightId?: string | null
+  onHover?: (id: string | null) => void
+  /** Data to colour the areas by; null = plain region colours. */
+  layer?: ResolvedLayer | null
+  initialBounds?: LngLatBoundsLike
+  outsideLabel?: string
+  noDataLabel?: string
+  /** Shown when a commune displays its county's value. */
+  countyFigureLabel?: string
+}
 
-export default function RomaniaMap({ onSelect, initialCounty = 'AB', initialBounds = RO_BOUNDS, choropleth = null, legendLow = 'low', legendHigh = 'high', legendInfo }: Props) {
+type FeatureRef = { source: 'counties' | 'communes'; id: string }
+const refOf = (id: string): FeatureRef => ({ source: id.includes('-') ? 'communes' : 'counties', id })
+const match = (prop: string, pairs: string[]): ExpressionSpecification | string =>
+  pairs.length ? (['match', ['get', prop], ...pairs, NO_DATA] as unknown as ExpressionSpecification) : NO_DATA
+
+const RomaniaMap = forwardRef<MapHandle, Props>(function RomaniaMap(
+  { selectedId, onSelect, highlightId = null, onHover, layer = null, initialBounds = RO_BOUNDS, outsideLabel = 'Outside study area', noDataLabel = 'no data', countyFigureLabel = 'county figure' },
+  handle,
+) {
   const container = useRef<HTMLDivElement>(null)
+  const tip = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MlMap | null>(null)
   const [ready, setReady] = useState(false)
-  const onSelectRef = useRef(onSelect)
-  onSelectRef.current = onSelect
+  const latest = useRef({ onSelect, onHover, layer, outsideLabel, noDataLabel, countyFigureLabel })
+  latest.current = { onSelect, onHover, layer, outsideLabel, noDataLabel, countyFigureLabel }
+  const shown = useRef<{ selected: FeatureRef | null; highlight: FeatureRef | null; hover: FeatureRef | null }>({ selected: null, highlight: null, hover: null })
+
+  useImperativeHandle(handle, () => ({
+    flyTo: (center, zoom) => mapRef.current?.easeTo({ center, zoom, duration: 700 }),
+  }), [])
 
   useEffect(() => {
     if (!container.current) return
@@ -92,112 +116,160 @@ export default function RomaniaMap({ onSelect, initialCounty = 'AB', initialBoun
         dragRotate: false,
         pitchWithRotate: false,
       })
-      map.touchZoomRotate.disableRotation()
-      if (import.meta.env.DEV) (window as unknown as { __map: MlMap }).__map = map // debugging aid
-      mapRef.current = map
-      map.once('load', () => {
+      const m = map
+      m.touchZoomRotate.disableRotation()
+      if (import.meta.env.DEV) (window as unknown as { __map: MlMap }).__map = m // debugging aid
+      mapRef.current = m
+      m.addControl(new NavigationControl({ showCompass: false }), 'top-right')
+      m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left')
+      m.addControl(new AttributionControl({ compact: true }), 'bottom-right')
+      m.once('load', () => {
         if (cancelled) return
         // Start the compact attribution collapsed (it covers half the map on phones).
         container.current?.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show')
         setReady(true)
       })
-      map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
-      map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left')
-      map.addControl(new AttributionControl({ compact: true }), 'bottom-right')
+      // The pane can change size (sidebar / data panel open-close).
+      const ro = new ResizeObserver(() => m.resize())
+      ro.observe(container.current)
+      m.once('remove', () => ro.disconnect())
 
-      let hovered: FeatureRef | null = null
-      let selected: FeatureRef | null = null
-      const setState = (ref: FeatureRef | null, state: Record<string, boolean>) => {
-        if (ref) map!.setFeatureState(ref, state)
+      const pick = (e: MapMouseEvent): MapGeoJSONFeature | null => {
+        const layers = m.getZoom() >= 8 ? ['commune-fill', 'county-fill'] : ['county-fill']
+        const f = m.queryRenderedFeatures(e.point, { layers })[0]
+        return f && f.id !== undefined ? f : null
+      }
+      const setHover = (ref: FeatureRef | null) => {
+        const cur = shown.current.hover
+        if (cur?.id === ref?.id) return
+        if (cur && cur.id !== shown.current.highlight?.id) m.setFeatureState(cur, { hover: false })
+        if (ref) m.setFeatureState(ref, { hover: true })
+        shown.current.hover = ref
+        latest.current.onHover?.(ref?.id ?? null)
       }
 
-      const pick = (e: MapLayerMouseEvent): FeatureRef & { f: MapGeoJSONFeature } | null => {
-        const layers = map!.getZoom() >= 8 ? ['commune-fill', 'county-fill'] : ['county-fill']
-        const f = map!.queryRenderedFeatures(e.point, { layers })[0]
-        if (!f || f.id === undefined) return null
-        return { source: f.source as FeatureRef['source'], id: f.id, f }
-      }
-
-      const select = (ref: (FeatureRef & { f?: MapGeoJSONFeature }) | null, props?: Record<string, string>) => {
-        setState(selected, { selected: false })
-        selected = ref
-        setState(selected, { selected: true })
-        if (!ref || !props) return onSelectRef.current?.(null)
-        onSelectRef.current?.(
-          ref.source === 'counties'
-            ? { kind: 'county', code: props.code, name: props.name, region: props.region, nuts2: props.nuts2 }
-            : { kind: 'commune', id: props.id, name: props.name, county: props.county, countyName: props.county_name, region: props.region },
-        )
-      }
-
-      map.on('mousemove', (e) => {
-        const hit = pick(e)
-        if (hovered && (!hit || hit.id !== hovered.id || hit.source !== hovered.source)) {
-          setState(hovered, { hover: false })
-          hovered = null
+      m.on('mousemove', (e) => {
+        const f = pick(e)
+        const el = tip.current
+        if (!f) {
+          setHover(null)
+          m.getCanvas().style.cursor = ''
+          if (el) el.style.display = 'none'
+          return
         }
-        if (hit && !hovered) {
-          hovered = { source: hit.source, id: hit.id }
-          setState(hovered, { hover: true })
+        const id = String(f.id)
+        setHover(refOf(id))
+        m.getCanvas().style.cursor = 'pointer'
+        if (el) {
+          const p = f.properties as Record<string, string>
+          const l = latest.current.layer
+          const inAoi = AOI.includes(p.county ?? p.code)
+          let line = ''
+          if (!inAoi) line = latest.current.outsideLabel
+          else if (l) {
+            // County-level layers (e.g. procurement scores from county statistics): a commune shows its county's value.
+            const viaCounty = l.level === 'county' && id.includes('-')
+            const v = l.values[viaCounty ? p.county : id]
+            line = v === null || v === undefined
+              ? `${l.label}: ${latest.current.noDataLabel}`
+              : `${l.label}: <b>${fmt(v, digitsFor(l.scale.max))} ${l.unit}</b>${viaCounty ? ` <span class="map-tip-note">(${latest.current.countyFigureLabel})</span>` : ''}`
+          }
+          el.innerHTML = `<div class="map-tip-name"></div><div class="map-tip-val">${line}</div>`
+          ;(el.firstChild as HTMLElement).textContent = p.county_name ? `${p.name} · ${p.county_name}` : p.name
+          el.style.display = 'block'
+          const w = m.getContainer().clientWidth
+          el.style.left = `${Math.min(e.point.x + 14, w - el.offsetWidth - 6)}px`
+          el.style.top = `${Math.max(6, e.point.y - el.offsetHeight - 10)}px`
         }
-        map!.getCanvas().style.cursor = hit ? 'pointer' : ''
       })
-      map.on('mouseout', () => {
-        setState(hovered, { hover: false })
-        hovered = null
+      m.on('mouseout', () => {
+        setHover(null)
+        if (tip.current) tip.current.style.display = 'none'
       })
-      map.on('click', (e) => {
-        const hit = pick(e)
-        select(hit, hit?.f.properties as Record<string, string> | undefined)
+      m.on('click', (e) => {
+        const f = pick(e)
+        if (!f) return
+        const p = f.properties as Record<string, string>
+        const isCommune = f.source === 'communes'
+        const county = isCommune ? p.county : p.code
+        latest.current.onSelect?.({
+          id: String(f.id),
+          kind: isCommune ? 'commune' : 'county',
+          name: p.name,
+          county,
+          countyName: isCommune ? p.county_name : p.name,
+          inAoi: AOI.includes(county),
+        })
       })
-
-      // Pre-select Alba once the counties source is loaded.
-      const preselect = () => {
-        if (!map!.isSourceLoaded('counties')) return
-        map!.off('sourcedata', preselect)
-        const f = map!.querySourceFeatures('counties', { filter: ['==', ['get', 'code'], initialCounty] })[0]
-        if (f) select({ source: 'counties', id: initialCounty }, f.properties as Record<string, string>)
-      }
-      map.on('sourcedata', preselect)
     })()
 
     return () => {
       cancelled = true
       mapRef.current = null
+      shown.current = { selected: null, highlight: null, hover: null }
       setReady(false)
       map?.remove()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialCounty])
+  }, [])
 
-  // Choropleth mode (procurement): colour counties by score; otherwise region colours.
+  // Selected area outline.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    const prev = shown.current.selected
+    if (prev) map.setFeatureState(prev, { selected: false })
+    const next = selectedId ? refOf(selectedId) : null
+    if (next) map.setFeatureState(next, { selected: true })
+    shown.current.selected = next
+  }, [selectedId, ready])
+
+  // Outline of the area hovered elsewhere in the UI (table rows).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    const prev = shown.current.highlight
+    if (prev && prev.id !== shown.current.hover?.id) map.setFeatureState(prev, { hover: false })
+    const next = highlightId ? refOf(highlightId) : null
+    if (next) map.setFeatureState(next, { hover: true })
+    shown.current.highlight = next
+  }, [highlightId, ready])
+
+  // Colour areas by the active data layer, or fall back to region colours.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready || !map.getLayer('county-fill')) return
-    if (choropleth) {
-      const pairs = Object.entries(choropleth.values).flatMap(([code, v]) => [code, scoreColor(v)])
-      const expr = pairs.length ? (['match', ['get', 'code'], ...pairs, '#e5e7eb'] as unknown as ExpressionSpecification) : '#e5e7eb'
-      map.setPaintProperty('county-fill', 'fill-color', expr)
-      map.setPaintProperty('county-fill', 'fill-opacity', CHOROPLETH_OPACITY)
-    } else {
+    if (!layer) {
       map.setPaintProperty('county-fill', 'fill-color', countyColorExpression)
       map.setPaintProperty('county-fill', 'fill-opacity', COUNTY_OPACITY)
+      map.setPaintProperty('commune-fill', 'fill-color', '#1d4ed8')
+      map.setPaintProperty('commune-fill', 'fill-opacity', COMMUNE_OPACITY)
+      return
     }
-  }, [choropleth, ready])
+    const counties: string[] = []
+    const communes: string[] = []
+    for (const [id, v] of Object.entries(layer.values)) {
+      ;(id.includes('-') ? communes : counties).push(id, layer.scale.color(v))
+    }
+    map.setPaintProperty('county-fill', 'fill-color', match('code', counties))
+    if (layer.level === 'commune') {
+      // communes carry the colour; counties stay as outlines
+      map.setPaintProperty('county-fill', 'fill-opacity', 0)
+      map.setPaintProperty('commune-fill', 'fill-color', match('id', communes))
+      map.setPaintProperty('commune-fill', 'fill-opacity', DATA_OPACITY)
+    } else {
+      map.setPaintProperty('county-fill', 'fill-opacity', DATA_OPACITY)
+      map.setPaintProperty('commune-fill', 'fill-color', '#1d4ed8')
+      map.setPaintProperty('commune-fill', 'fill-opacity', COMMUNE_OPACITY)
+    }
+  }, [layer, ready])
 
   return (
     <div className="map-wrap">
       <div ref={container} className="map" />
-      {choropleth && (
-        <div className="map-legend">
-          <div className="small"><b>{choropleth.label}</b> {legendInfo && <Info>{legendInfo}</Info>}</div>
-          <div className="legend-row">
-            <span className="muted tiny">{legendLow}</span>
-            {BUCKETS.map((b) => <i key={b} style={{ background: scoreColor(b) }} />)}
-            <span className="muted tiny">{legendHigh}</span>
-          </div>
-        </div>
-      )}
+      <div ref={tip} className="map-tip" style={{ display: 'none' }} />
     </div>
   )
-}
+})
+
+export default RomaniaMap

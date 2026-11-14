@@ -50,6 +50,7 @@ export type AreaBundle = {
   indicators: Indicator[]
   agro_yearly: AgroYearly
   soil: Soil
+  terrain: null | Terrain
   cropmap: null | CropMap
   crop_stats: { source: string; years: number[]; confidence: Confidence; county: string; values: Record<string, CropSeries> }
 }
@@ -119,4 +120,31 @@ export type ProcurementResponse = {
   recommendations: Recommendation[]
   assumptions: string[]
   sources: string[]
+}
+
+export type MapLayerData = {
+  kind: 'indicator' | 'agro' | 'soil' | 'cropshare'
+  key: string
+  label: string
+  unit: string
+  years: string[] | null
+  values: Record<string, (number | null)[]>
+  palette: 'blue' | 'red' | 'green' | 'brown' | 'div'
+  source: string
+}
+
+export type Terrain = {
+  sources: { terrain: string; landcover: string }
+  resolution: { terrain: string; landcover: string }
+  steep_threshold_pct: number
+  classes: Record<string, string>
+  confidence: Confidence
+  values: {
+    elevation_m?: number
+    slope_pct?: number
+    steep_share_pct?: number
+    cropland_slope_pct?: number
+    cropland_steep_share_pct?: number
+    landcover_pct?: Record<string, number>
+  }
 }

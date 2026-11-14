@@ -1,29 +1,60 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getArea } from '../../api/client'
 import type { Priorities } from '../../api/types'
-import Card from '../../components/Card'
 import { PALETTE } from '../../components/Chart'
+import Collapsible from '../../components/Collapsible'
 import { useAsync } from '../../components/useAsync'
 import { useI18n } from '../../i18n'
+import { useExplain } from '../../i18n/explain'
+import { indicatorLabel } from '../../i18n/names'
+import { useMapLink } from '../../state/MapLink'
+import type { FarmerSection } from '../../state/sections'
 import CropMixCard from './CropMixCard'
 import CropStatsCard from './CropStatsCard'
-import IndicatorCard from './IndicatorCard'
+import IndicatorChart from './IndicatorChart'
+import Overview, { type OverviewPick } from './Overview'
 import PrioritiesPanel from './PrioritiesPanel'
-import RotationCompare from './RotationCompare'
+import RotationCompare, { PRESETS, type Rot } from './RotationCompare'
 import SeasonEvents from './SeasonEvents'
 import SoilCard from './SoilCard'
 
-const MAIN = ['imerg_precip', 'gldas_rootmoist', 'power_heat_days', 'gldas_et', 'firms_fires', 'power_tmax', 'modis_ndvi']
+const MAIN = ['imerg_precip', 'modis_ndvi', 'smap_soil_moisture', 'gldas_rootmoist', 'power_heat_days', 'modis_et', 'grace_tws', 'firms_fires']
 const COLORS: Record<string, string> = {
-  imerg_precip: PALETTE[0], gldas_rootmoist: PALETTE[5], power_heat_days: PALETTE[4], gldas_et: PALETTE[2],
-  firms_fires: PALETTE[1], power_tmax: PALETTE[7], modis_ndvi: PALETTE[6],
+  imerg_precip: PALETTE[0], gldas_rootmoist: PALETTE[5], power_heat_days: PALETTE[4], modis_et: PALETTE[2],
+  firms_fires: PALETTE[1], grace_tws: PALETTE[7], modis_ndvi: PALETTE[6], smap_soil_moisture: PALETTE[3],
 }
 
-export default function FarmerView({ unitId, countyName }: { unitId: string; countyName: string }) {
-  const { t } = useI18n()
+/** One section at a time; the choices made in each section are kept while you move around. */
+export default function FarmerView({ unitId, countyName, section, active }: {
+  unitId: string
+  countyName: string
+  section: FarmerSection
+  /** False while the procurement role is shown (this view stays mounted to keep its state). */
+  active: boolean
+}) {
+  const { t, lang } = useI18n()
+  const x = useExplain()
+  const { setSpec } = useMapLink()
   const area = useAsync(unitId, () => getArea(unitId))
   const [prio, setPrio] = useState<Priorities>({ yield: 25, water: 25, soil: 25, risk: 25 })
+  const [rots, setRots] = useState<Rot[]>(PRESETS.slice(0, 2))
+  const [overview, setOverview] = useState<OverviewPick>({ spec: { kind: 'indicator', key: 'imerg_precip' } })
+  const [indicator, setIndicator] = useState('imerg_precip')
+  const [risk, setRisk] = useState('heat35_jul_aug')
+  const [soilProp, setSoilProp] = useState('phh2o')
+  const [crop, setCrop] = useState('216')
   const [more, setMore] = useState(false)
+
+  // The map follows the section: it is coloured by whatever is selected here.
+  useEffect(() => {
+    if (!active) return
+    if (section === 'overview') setSpec(overview.spec, overview.year)
+    else if (section === 'weather') setSpec({ kind: 'indicator', key: indicator })
+    else if (section === 'risks') setSpec({ kind: 'agro', key: risk })
+    else if (section === 'soil') setSpec({ kind: 'soil', key: soilProp })
+    else if (section === 'crops') setSpec({ kind: 'cropshare', key: crop })
+    else setSpec(null)
+  }, [active, section, overview, indicator, risk, soilProp, crop, setSpec])
 
   if (area.error) return <p className="note warn">{t('error')}: {area.error}</p>
   if (!area.data) return <p className="muted pad">{t('loading')}</p>
@@ -31,28 +62,56 @@ export default function FarmerView({ unitId, countyName }: { unitId: string; cou
   const kind = a.unit.kind
   const main = a.indicators.filter((i) => MAIN.includes(i.name))
   const rest = a.indicators.filter((i) => !MAIN.includes(i.name))
+  const current = a.indicators.find((i) => i.name === indicator) ?? a.indicators[0]
 
   return (
     <div className={`view ${area.loading ? 'stale' : ''}`}>
-      <h2 className="section">{t('whatHappened')}</h2>
-      <p className="muted small section-sub">{t('whatHappenedSub')}</p>
-      <div className="grid">
-        {main.map((ind, i) => <IndicatorCard key={ind.name} ind={ind} color={COLORS[ind.name] ?? PALETTE[i % PALETTE.length]} kind={kind} />)}
-        {more && rest.map((ind, i) => <IndicatorCard key={ind.name} ind={ind} color={PALETTE[(i + 3) % PALETTE.length]} kind={kind} />)}
-      </div>
-      <button className="ghost" onClick={() => setMore(!more)}>{more ? '−' : '+'} {rest.length} more indicators</button>
+      {section === 'overview' && <Overview a={a} pick={overview} onPick={setOverview} />}
 
-      <SeasonEvents agro={a.agro_yearly} kind={kind} />
-      <div className="grid two">
-        <SoilCard soil={a.soil} kind={kind} />
-        <CropStatsCard stats={a.crop_stats} countyName={countyName} />
-      </div>
-      {a.cropmap && <CropMixCard cm={a.cropmap} stats={a.crop_stats} kind={kind} />}
+      {section === 'weather' && (
+        <div className="stack">
+          <div className="chips">
+            {[...main, ...(more ? rest : [])].map((i) => (
+              <button key={i.name} type="button" className={`chip ${i.name === current.name ? 'on' : ''}`} onClick={() => setIndicator(i.name)}>
+                {indicatorLabel(i.name, i.label, lang)}
+              </button>
+            ))}
+            <button type="button" className="link" onClick={() => setMore(!more)}>
+              {more ? `− ${t('less')}` : `+ ${rest.length} ${t('moreIndicators')}`}
+            </button>
+          </div>
+          <IndicatorChart key={current.name} ind={current} color={COLORS[current.name] ?? PALETTE[3]} kind={kind} />
+        </div>
+      )}
 
-      <PrioritiesPanel value={prio} onChange={setPrio} />
-      <RotationCompare unitId={unitId} priorities={prio} />
+      {section === 'risks' && <SeasonEvents agro={a.agro_yearly} kind={kind} selected={risk} onSelect={setRisk} />}
 
-      <Card title={t('aiTitle')} className="muted-card"><p className="muted small">{t('aiBody')}</p></Card>
+      {section === 'soil' && <SoilCard soil={a.soil} terrain={a.terrain} kind={kind} selected={soilProp} onSelect={setSoilProp} />}
+
+      {section === 'crops' && (
+        <div className="stack">
+          {a.cropmap && (
+            <Collapsible id="crops-mix" title={t('cropMixTitle')} info={x.cropMix.ha} defaultOpen>
+              <CropMixCard cm={a.cropmap} stats={a.crop_stats} kind={kind} selected={crop} onSelect={setCrop} />
+            </Collapsible>
+          )}
+          <Collapsible id="crops-yields" title={`${t('countyYields')}: ${countyName}`} info={x.cropStats}>
+            <CropStatsCard stats={a.crop_stats} />
+          </Collapsible>
+        </div>
+      )}
+
+      {section === 'rotations' && (
+        <div className="stack">
+          <Collapsible id="rot-priorities" title={t('priorities')} info={x.priorities} defaultOpen>
+            <PrioritiesPanel value={prio} onChange={setPrio} />
+          </Collapsible>
+          <Collapsible id="rot-compare" title={t('rotations')} info={x.general.scoreScale} defaultOpen>
+            <RotationCompare unitId={unitId} priorities={prio} rots={rots} setRots={setRots} />
+          </Collapsible>
+          <p className="muted small"><b>{t('aiTitle')}:</b> {t('aiBody')}</p>
+        </div>
+      )}
     </div>
   )
 }

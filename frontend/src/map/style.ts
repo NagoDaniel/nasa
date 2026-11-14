@@ -67,6 +67,16 @@ export const CHOROPLETH_OPACITY: ExpressionSpecification = [
   12, countyOpacity(0.2),
 ]
 
+/** Default look: communes are invisible until hovered / selected. */
+export const COMMUNE_OPACITY: ExpressionSpecification = [
+  'case',
+  ['boolean', ['feature-state', 'selected'], false], 0.28,
+  ['boolean', ['feature-state', 'hover'], false], 0.14,
+  0,
+]
+/** Data-coloured look (same for counties and communes): solid, a bit lighter when zoomed in. */
+export const DATA_OPACITY: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 7, 0.82, 10, 0.68, 13, 0.45]
+
 /** Layers placed low in the stack (under roads / water / labels). */
 export const lowLayers: LayerSpecification[] = [
   {
@@ -100,15 +110,9 @@ export const lowLayers: LayerSpecification[] = [
     id: 'commune-fill',
     type: 'fill',
     source: 'communes',
-    minzoom: 8,
     paint: {
       'fill-color': '#1d4ed8',
-      'fill-opacity': [
-        'case',
-        ['boolean', ['feature-state', 'selected'], false], 0.28,
-        ['boolean', ['feature-state', 'hover'], false], 0.14,
-        0,
-      ],
+      'fill-opacity': COMMUNE_OPACITY,
     },
   },
 ]
@@ -152,9 +156,20 @@ export const topLayers: LayerSpecification[] = [
     id: 'county-selected-line',
     type: 'line',
     source: 'counties',
+    layout: { 'line-join': 'round' },
     paint: {
       'line-color': '#111827',
-      'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3, 0],
+      'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3.5, ['boolean', ['feature-state', 'hover'], false], 3, 0],
+    },
+  },
+  {
+    id: 'commune-selected-line',
+    type: 'line',
+    source: 'communes',
+    layout: { 'line-join': 'round' },
+    paint: {
+      'line-color': '#111827',
+      'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3, ['boolean', ['feature-state', 'hover'], false], 2, 0],
     },
   },
   {

@@ -1,5 +1,5 @@
 import type { FeatureCollection } from 'geojson'
-import type { AreaBundle, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
+import type { AreaBundle, MapLayerData, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
 
 const BASE = '/api'
 
@@ -22,6 +22,8 @@ export type GeoLayer = 'counties' | 'regions' | 'communes' | 'outline' | 'mask' 
 export const getGeoLayer = (layer: GeoLayer) => getJson<FeatureCollection>(`/geo/${layer}`)
 export const getUnits = () => getJson<Unit[]>('/units')
 export const getArea = (id: string) => getJson<AreaBundle>(`/area/${encodeURIComponent(id)}`)
+export const getMapLayer = (kind: string, key: string) =>
+  getJson<MapLayerData>(`/map?kind=${encodeURIComponent(kind)}&key=${encodeURIComponent(key)}`)
 export const getProcurement = (crop: string) => getJson<ProcurementResponse>(`/procurement?crop=${encodeURIComponent(crop)}`)
 
 export const scoreRotations = (unit: string, priorities: Priorities, rotations: { name: string; crops: string[] }[], signal?: AbortSignal) =>

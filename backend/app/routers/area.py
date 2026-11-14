@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import APIRouter
 
 from .. import datasets as ds
+from ..maplayers import map_layer
 
 router = APIRouter(tags=["area"])
 
@@ -25,9 +26,16 @@ def area(uid: str) -> dict[str, Any]:
         "indicators": indicators,
         "agro_yearly": ds.agro(uid),
         "soil": ds.soil(uid),
+        "terrain": ds.terrain(uid),
         "cropmap": ds.cropmap(uid),
         "crop_stats": {
             "source": ins["source"], "years": ins["years"], "confidence": ins["confidence"],
             "county": county, "values": ins["counties"].get(county, {}),
         },
     }
+
+
+@router.get("/map")
+def map_values(kind: str, key: str) -> dict[str, Any]:
+    """Values per unit (all years) for colouring the map: kind = indicator | agro | soil | cropshare."""
+    return map_layer(kind, key)

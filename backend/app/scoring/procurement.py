@@ -52,7 +52,36 @@ def _clamp(x: float) -> float:
     return max(0.0, min(100.0, x))
 
 
-def county_metrics(crop: str, code: str, ins_c: dict, agro: dict, traits: dict, fires: list | None) -> dict[str, Any]:
+NDVI_MONTHS = (4, 5, 6, 7, 8)  # main growing season of the study area's arable crops
+
+
+def vegetation_signal(keys: list[str], vals: list | None) -> dict[str, Any] | None:
+    """Apr–Aug mean cropland NDVI per year; latest full season vs the mean of the earlier ones.
+
+    All cropland together (MODIS cannot tell crops apart at 1 km), so it is context for
+    availability, not a crop-specific yield estimate. A season needs all five months."""
+    if not vals:
+        return None
+    by: dict[int, list[float]] = {}
+    for k, v in zip(keys, vals):
+        if v is not None and int(k[5:7]) in NDVI_MONTHS:
+            by.setdefault(int(k[:4]), []).append(v)
+    seasons = {y: sum(v) / len(v) for y, v in by.items() if len(v) == len(NDVI_MONTHS)}
+    if len(seasons) < 3:
+        return None
+    last = max(seasons)
+    base_years = [y for y in seasons if y != last]
+    base = sum(seasons[y] for y in base_years) / len(base_years)
+    return {
+        "year": last, "ndvi": round(seasons[last], 3), "baseline": round(base, 3),
+        "baseline_years": [min(base_years), max(base_years)],
+        "vs_baseline_pct": round(100 * (seasons[last] / base - 1), 1),
+        "seasons": {str(y): round(v, 3) for y, v in sorted(seasons.items())},
+    }
+
+
+def county_metrics(crop: str, code: str, ins_c: dict, agro: dict, traits: dict, fires: list | None,
+                   ndvi: dict | None = None) -> dict[str, Any]:
     t = traits["crops"][crop]
     A = traits["assumptions"]
     rec = ins_c.get(_proxy(crop)) or {}
@@ -101,7 +130,9 @@ def county_metrics(crop: str, code: str, ins_c: dict, agro: dict, traits: dict, 
             "latest_vs_median_pct": round((latest / hist_med - 1) * 100) if latest and hist_med else None,
             "area_ha_latest": area[-1] if area else None, "area_trend_pct_yr": round(_slope_pct(area), 1) if _slope_pct(area) is not None else None,
             "yield_cv": round(ycv, 2) if ycv is not None else None, "hazard_years": len(bad), "years": len(valid),
-            "series": {"years": years, "production_t": prod, "area_ha": area, "yield_kg_ha": yld},
+            # INS years start with the agro years (2015) but end earlier (agro has 2026 where POWER has it)
+            "series": {"years": years[:len(prod)], "production_t": prod, "area_ha": area, "yield_kg_ha": yld},
+            "vegetation": vegetation_signal(ndvi["keys"], ndvi["units"].get(code)) if ndvi else None,
         },
         "quality": {
             "score": round(quality), "hazard_freq": round(freq, 2) if freq is not None else None,
@@ -119,13 +150,13 @@ def county_metrics(crop: str, code: str, ins_c: dict, agro: dict, traits: dict, 
 
 
 def procurement(crop: str, counties: dict[str, str], ins: dict, agro_all: dict, traits: dict,
-                fires_all: dict) -> dict[str, Any]:
+                fires_all: dict, ndvi: dict | None = None) -> dict[str, Any]:
     if crop not in traits["crops"]:
         raise ValueError(f"unknown crop {crop}")
     out = {}
     for code, name in counties.items():
         agro = {"years": agro_all["years"], "values": agro_all["units"].get(code, {})}
-        m = county_metrics(crop, code, ins["counties"].get(code, {}), agro, traits, fires_all.get(code))
+        m = county_metrics(crop, code, ins["counties"].get(code, {}), agro, traits, fires_all.get(code), ndvi)
         out[code] = {"name": name, **m}
 
     recs = recommendations(crop, out, ins, agro_all, traits, counties)
@@ -137,7 +168,8 @@ def procurement(crop: str, counties: dict[str, str], ins: dict, agro_all: dict, 
         "recommendations": recs,
         "assumptions": [
             "Availability = 100 × (1 − 0.5 × min(1, yield CV / 40%) − 0.5 × share of hazard years); production volume is shown alongside.",
-            "Quality = 100 × (1 − share of 2015–2025 years in which the crop's sensitive window was hit).",
+            "Quality = 100 × (1 − share of years in which the crop's sensitive window was hit; 2015–2025, plus 2026 where NASA POWER has 2026 data).",
+            "Cropland greenness = Apr–Aug mean MODIS NDVI over cropland pixels, latest season vs the mean of the earlier seasons (2022 onward). All crops together; shown as context, not part of the scores.",
             "Hazard thresholds: " + "; ".join(HAZARDS[k].text for k in crop_hazard_keys(t)) + ".",
             "Impact = mean of water score (dry-year Apr–Sep rain ÷ crop water need) and emissions score (100 at 0, 0 at ≥ 400 kg CO2e/t).",
             f"Emissions are field N2O only: mid-range N fertiliser ({t['n_fert_kg_ha'][0]}–{t['n_fert_kg_ha'][1]} kg N/ha) × IPCC EF1 1% × 44/28 × GWP100 273 ÷ 5-year median yield. Fertiliser manufacture, fuel and transport are not included.",
@@ -146,6 +178,7 @@ def procurement(crop: str, counties: dict[str, str], ins: dict, agro_all: dict, 
             "INS TEMPO AGR108A/109A/110A (area, production, yield), county level",
             "NASA POWER daily and NASA GLDAS Noah monthly (hazard years, rain)",
             "NASA FIRMS VIIRS (vegetation fires)",
+            "NASA MODIS MOD13A3 NDVI on ESA WorldCover 2021 cropland (season greenness)",
             "Crop traits: FAO (Brouwer & Heibloem 1986; FAO-56), IPCC 2019, AR6",
         ],
     }
@@ -179,21 +212,33 @@ def recommendations(crop: str, data: dict, ins: dict, agro_all: dict, traits: di
                             "share_of_region_pct": round(100 * (prod[a] + prod[b]) / total)},
             })
 
-    # 2. This season's quality alerts, grouped by hazard
+    # 2. This season's quality alerts, grouped by season and hazard. The latest season with
+    # weather data differs by county (2026 only where NASA POWER 2026 data were downloaded).
     hit = {c: d["quality"]["latest_hits"] for c, d in data.items() if d["quality"]["latest_hits"] and prod[c] > 0}
     if hit:
-        yr = next(iter(data.values()))["quality"]["latest_year"]
-        by_hazard: dict[str, list[str]] = {}
+        by_year: dict[int, dict[str, list[str]]] = {}
         for c, ks in hit.items():
+            yr = data[c]["quality"]["latest_year"]
             for k in ks:
-                by_hazard.setdefault(k, []).append(counties[c])
-        parts = [f"{HAZARDS[k].text}: {', '.join(cs) if len(cs) < len(counties) else 'all counties'}"
-                 for k, cs in sorted(by_hazard.items(), key=lambda x: -len(x[1]))]
+                by_year.setdefault(yr, {}).setdefault(k, []).append(counties[c])
+        segs = []
+        for yr in sorted(by_year, reverse=True):
+            n_yr = sum(1 for d in data.values() if d["quality"]["latest_year"] == yr)
+            parts = [f"{HAZARDS[k].text}: {', '.join(cs) if len(cs) < n_yr else 'all counties with ' + str(yr) + ' data'}"
+                     for k, cs in sorted(by_year[yr].items(), key=lambda x: -len(x[1]))]
+            segs.append(f"In {yr} the {crop} sensitive period was hit — " + "; ".join(parts) + ".")
+        latest = {c: d["quality"]["latest_year"] for c, d in data.items() if d["quality"]["latest_year"]}
+        note = ""
+        if len(set(latest.values())) > 1:
+            newest = max(latest.values())
+            have = [counties[c] for c, y in latest.items() if y == newest]
+            note = f" {newest} weather data exist only for {', '.join(have)}; the other counties show their latest season ({min(latest.values())})."
+        years_txt = "/".join(str(y) for y in sorted(by_year, reverse=True))
         recs.append({
-            "type": "quality", "title": f"Check {yr} lots for weather-related quality problems",
-            "text": f"In {yr} the {crop} sensitive period was hit — " + "; ".join(parts) + ". "
-                    + traits["crops"][crop]["sensitive"]["quality"] + " Test incoming lots (e.g. mycotoxins) before blending.",
-            "numbers": {"counties": list(hit), "by_hazard": by_hazard},
+            "type": "quality", "title": f"Check {years_txt} lots for weather-related quality problems",
+            "text": " ".join(segs) + " " + traits["crops"][crop]["sensitive"]["quality"]
+                    + " Test incoming lots (e.g. mycotoxins) before blending." + note,
+            "numbers": {"counties": list(hit), "by_year_hazard": {str(y): v for y, v in by_year.items()}},
         })
 
     # 3. Alternative ingredient in the same functional group
