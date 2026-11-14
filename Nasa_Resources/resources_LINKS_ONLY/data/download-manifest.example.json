@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "example_only": true,
+  "records": [
+    {
+      "record_id": null,
+      "source_ids": [],
+      "product": null,
+      "version": null,
+      "file_paths": [],
+      "stable_data_location": null,
+      "temporal_start": null,
+      "temporal_end": null,
+      "area": null,
+      "variables": [],
+      "units": {},
+      "crs": null,
+      "native_resolution": null,
+      "downloaded_on": null,
+      "processing_timestamp": null,
+      "qa_policy": null,
+      "checksums": {},
+      "citation": null,
+      "license_notes": null,
+      "verification_status": "uninspected"
+    }
+  ]
+}
