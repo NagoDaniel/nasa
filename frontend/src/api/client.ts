@@ -1,5 +1,5 @@
 import type { FeatureCollection } from 'geojson'
-import type { AreaBundle, AssistantStatus, FieldContextResp, FieldMeasure, FieldPolygon, SavedField, VegJob, ChatContext, ChatResponse, ChatTurn, Forecast, MapLayerData, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
+import type { AreaBundle, AssistantStatus, FieldContextResp, FieldMeasure, FieldPolygon, SavedField, VegJob, ChatContext, ChatResponse, ChatTurn, Forecast, HarvestReport, Learning, MapLayerData, PlanAnswers, PlannerField, PlanResponse, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
 
 const BASE = '/api'
 
@@ -65,3 +65,9 @@ export const listFields = () => getJson<SavedField[]>('/fields')
 export const createField = (name: string, geometry: FieldPolygon) => post<SavedField>('/fields', { name, geometry })
 export const updateField = (id: number, patch: { name?: string; geometry?: FieldPolygon }) => post<SavedField>(`/fields/${id}`, patch, 'PUT')
 export const deleteField = (id: number) => getJson<{ deleted: number }>(`/fields/${id}`, { method: 'DELETE' })
+
+// ---------- field planner ----------
+export const getPlannerField = (id: number) => getJson<PlannerField>(`/planner/fields/${id}`)
+export const makePlan = (id: number, answers: PlanAnswers) => post<PlanResponse>(`/planner/fields/${id}/plan`, answers)
+export const addHarvestReport = (id: number, r: Omit<HarvestReport, 'id' | 'field_id' | 'source' | 'county'>) =>
+  post<{ saved: boolean; learning: Learning }>(`/planner/fields/${id}/reports`, r)

@@ -15,7 +15,7 @@ from ..config import settings
 from ..db import get_session
 from ..field import coarse, imagery
 from ..field.geom import check_size, describe, parse
-from ..models import Farm, Field_
+from ..models import Farm, FieldPlan, Field_, HarvestReport
 
 router = APIRouter(prefix="/fields", tags=["fields"])
 jobs_limiter = RateLimiter(settings.rate_field_jobs_per_min, settings.rate_field_jobs_per_day, 0)
@@ -152,6 +152,8 @@ def delete_field(fid: int, request: Request, s: Session = Depends(get_session)) 
     f = s.get(Field_, fid)
     if f is None:
         raise HTTPException(404, "Field not found")
+    for row in [*s.exec(select(FieldPlan).where(FieldPlan.field_id == fid)), *s.exec(select(HarvestReport).where(HarvestReport.field_id == fid))]:
+        s.delete(row)  # planner answers and harvest reports belong to the field
     s.delete(f)
     s.commit()
     return {"deleted": fid}

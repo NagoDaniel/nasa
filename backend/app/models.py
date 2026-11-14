@@ -37,3 +37,33 @@ class FarmerPriorities(SQLModel, table=True):
     water_weight: float = 0.25
     soil_weight: float = 0.25
     risk_weight: float = 0.25
+
+
+class FieldPlan(SQLModel, table=True):
+    """Answers of the 'Plan my field' questions for one field (JSON, see app/planner)."""
+
+    __tablename__ = "field_plan"
+
+    id: int | None = Field(default=None, primary_key=True)
+    field_id: int = Field(foreign_key="field.id", index=True, unique=True)
+    answers_json: str = "{}"
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class HarvestReport(SQLModel, table=True):
+    """What a field actually gave in one season — the data the models learn from.
+
+    source = "history" (entered in the planner for past years) or "report" (after-harvest form)."""
+
+    __tablename__ = "harvest_report"
+
+    id: int | None = Field(default=None, primary_key=True)
+    field_id: int = Field(foreign_key="field.id", index=True)
+    year: int = Field(index=True)
+    crop: str
+    yield_t_ha: float | None = None
+    maturity: str | None = None  # early / medium / late (maize, sunflower, soy)
+    irrigated: bool = False
+    problems_json: str = "[]"  # e.g. ["drought", "hail"]
+    source: str = "report"
+    created_at: datetime = Field(default_factory=_now)

@@ -84,6 +84,7 @@ export const en = {
   countyFigure: 'county figure',
   // layout, sections and overview
   nav_field: 'My field',
+  nav_plan: 'Plan my field',
   nav_overview: 'Overview',
   nav_weather: 'Weather & water',
   nav_risks: 'Season risks',
@@ -94,6 +95,7 @@ export const en = {
   nav_recs: 'Recommendations',
   nav_trends: 'Trends & data',
   intro_field: 'Draw your field (drag a box or click its corners) to see satellite vegetation measured on it, and the coarser weather data for the area around it.',
+  intro_plan: 'Answer a few questions about your field and get a personal plan: what to grow each year, when to sow, expected yield, inputs and risks. Report each harvest so the plan learns your field.',
   intro_overview: 'The key facts for this area. Click a tile to see it on the map.',
   intro_weather: 'How rain, heat and soil water changed from 2015 to 2025.',
   intro_risks: 'Years when weather hit the crops at a sensitive moment.',

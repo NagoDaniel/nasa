@@ -7,6 +7,9 @@ year is computed the same way:
   - root-zone soil wetness (POWER GWETROOT) Jun–Jul and Jun–Aug, as anomalies (z-score
     vs 2000–2025), the stand-in for GLDAS soil moisture.
 Yields: INS TEMPO AGR110A from 2000 (county average yield, kg/ha).
+Also a climatology per county and year for the field planner (app/planner): last spring
+and first autumn frost, the day the 7-day mean air temperature first reaches 5 / 8 / 10 °C,
+and 5-day (pentad) mean temperature and rain total from 1 March to 26 November.
 Output: data/derived/forecast_inputs.json (counties only).
 """
 
@@ -16,7 +19,7 @@ import numpy as np
 import pandas as pd
 
 from agro_yearly import INDICATORS, POWER_SRC, _window, power_part
-from common import AOI, aggregate, raw, values, write_json
+from common import AOI, GridWeights, aggregate, raw, values, write_json
 from ins import COUNTY, CROPS
 from power import MIN_VALID, load_power_grid, power_weights
 
@@ -45,6 +48,46 @@ def soil_wetness() -> dict[str, dict[str, np.ndarray]]:
             with np.errstate(invalid="ignore", divide="ignore"):
                 z[u] = (v - np.nanmean(v[base])) / np.nanstd(v[base])
         out[key] = z
+    return out
+
+
+PENTAD_START = (3, 1)  # 1 March
+N_PENTADS = 54  # 1 Mar – 26 Nov
+
+
+def climate() -> dict[str, dict[str, list]]:
+    """Per county and year: frost dates, warm-up dates, pentad temperature and rain."""
+    dates, _, _, a = load_power_grid()
+    gw = power_weights()
+    sub = GridWeights(gw.lat, gw.lon, {c: gw.units[c] for c in AOI})
+    daily = {k: aggregate(a[k], sub, min_valid=MIN_VALID) for k in ("T2M", "T2M_MIN", "PRECTOTCORR")}
+    doy = np.asarray(dates.dayofyear)
+    out: dict[str, dict[str, list]] = {}
+    for c in AOI:
+        t, tmin, pr = daily["T2M"][c], daily["T2M_MIN"][c], daily["PRECTOTCORR"][c]
+        rec = {k: [] for k in ("last_frost_doy", "first_frost_doy", "warm5_doy", "warm8_doy", "warm10_doy", "pentad_t", "pentad_p")}
+        for y in YEARS:
+            yr = np.asarray(dates.year == y)
+            ty, tmy, py, dy = t[yr], tmin[yr], pr[yr], doy[yr]
+            complete = len(ty) >= 300 and np.isfinite(ty[:300]).all()
+            spring = (dy <= 181) & (tmy < 0)
+            autumn = (dy >= 182) & (tmy < 0)
+            rec["last_frost_doy"].append(int(dy[spring].max()) if complete and spring.any() else None)
+            rec["first_frost_doy"].append(int(dy[autumn].min()) if autumn.any() else None)
+            t7 = pd.Series(ty).rolling(7).mean().to_numpy()
+            for th in (5, 8, 10):
+                hit = np.flatnonzero((dy >= 60) & (t7 >= th))
+                rec[f"warm{th}_doy"].append(int(dy[hit[0]]) if complete and hit.size else None)
+            s0 = pd.Timestamp(y, *PENTAD_START).dayofyear
+            pt, pp = [], []
+            for k in range(N_PENTADS):
+                sel = (dy >= s0 + 5 * k) & (dy < s0 + 5 * k + 5)
+                ok = sel.sum() == 5 and np.isfinite(ty[sel]).all()
+                pt.append(round(float(ty[sel].mean()), 1) if ok else None)
+                pp.append(round(float(py[sel].sum()), 1) if ok else None)
+            rec["pentad_t"].append(pt)
+            rec["pentad_p"].append(pp)
+        out[c] = rec
     return out
 
 
@@ -88,6 +131,8 @@ def main() -> None:
         },
         "counties": counties,
         "yields": y,
+        "climate": {"pentad_start": "03-01", "n_pentads": N_PENTADS, "note": "day-of-year values; pentad = 5-day mean T2M (°C) / rain total (mm)",
+                    "counties": climate()},
     })
 
 

@@ -101,7 +101,8 @@ def crop_profile(ctx: Context, crop: str) -> dict[str, Any]:
 
 
 # ----------------------------------------------------------------------------- scoring
-def score_rotation(ctx: Context, crops: list[str], priorities: dict[str, float]) -> dict[str, Any]:
+def score_rotation(ctx: Context, crops: list[str], priorities: dict[str, float], prev_crop: str | None = None) -> dict[str, Any]:
+    """prev_crop: the crop grown the year before year 1 (field planner); default: the rotation repeats."""
     unknown = [c for c in crops if c not in ctx.traits["crops"]]
     if unknown:
         raise ValueError(f"unknown crops: {unknown}")
@@ -115,10 +116,10 @@ def score_rotation(ctx: Context, crops: list[str], priorities: dict[str, float])
     for i, crop in enumerate(crops):
         p = profiles[crop]
         t = p["trait"]
-        prev = crops[i - 1] if i > 0 else crops[-1]  # rotation repeats: year 1 follows the last year
+        prev = crops[i - 1] if i > 0 else (prev_crop or crops[-1])  # default: year 1 follows the last year
         mult = 1.0
         effects = []
-        wrap = " (rotation repeats)" if i == 0 else ""
+        wrap = (" (last year's crop)" if prev_crop else " (rotation repeats)") if i == 0 else ""
         if t["family"] == "cereal" and ctx.traits["crops"][prev]["legume"]:
             mult += A["legume_precrop_yield_bonus"]["value"]
             effects.append(f"+{A['legume_precrop_yield_bonus']['value']:.0%} after {prev}{wrap}")

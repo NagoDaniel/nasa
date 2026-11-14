@@ -81,6 +81,7 @@ export const ro: Dict = {
   countyFigure: 'cifră la nivel de județ',
   // layout, sections and overview
   nav_field: 'Parcela mea',
+  nav_plan: 'Planul parcelei',
   nav_overview: 'Rezumat',
   nav_weather: 'Vreme și apă',
   nav_risks: 'Riscuri de sezon',
@@ -91,6 +92,7 @@ export const ro: Dict = {
   nav_recs: 'Recomandări',
   nav_trends: 'Evoluție și date',
   intro_field: 'Desenați parcela (trageți un dreptunghi sau dați clic pe colțuri) ca să vedeți vegetația măsurată din satelit pe ea și datele meteo mai grosiere pentru zona din jur.',
+  intro_plan: 'Răspundeți la câteva întrebări despre parcelă și primiți un plan personal: ce să cultivați în fiecare an, când să semănați, producția așteptată, inputuri și riscuri. Raportați fiecare recoltă, ca planul să vă învețe parcela.',
   intro_overview: 'Datele-cheie pentru această zonă. Faceți clic pe o casetă ca să o vedeți pe hartă.',
   intro_weather: 'Cum s-au schimbat ploaia, căldura și apa din sol între 2015 și 2025.',
   intro_risks: 'Anii în care vremea a lovit culturile într-un moment sensibil.',

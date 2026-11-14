@@ -9,6 +9,7 @@ import AreaBar from './layout/AreaBar'
 import type { DrawMode, FieldOverlays, Ring } from './map/draw'
 import { FieldLink, type FieldLinkCtx } from './state/FieldLink'
 import FieldView from './views/farmer/FieldView'
+import PlanView from './views/plan/PlanView'
 import MapLegend from './layout/MapLegend'
 import Sidebar from './layout/Sidebar'
 import RomaniaMap, { type MapHandle, type MapPick } from './map/RomaniaMap'
@@ -138,6 +139,7 @@ function Shell() {
   const [liveRing, setLiveRing] = useState<Ring | null>(null)
   const [fieldOverlays, setFieldOverlays] = useState<FieldOverlays>({})
   const fieldActive = role === 'farmer' && sections.farmer === 'field'
+  const planActive = role === 'farmer' && sections.farmer === 'plan'
   const onFieldChange = useCallback((r: Ring | null, final: boolean) => {
     setLiveRing(r)
     if (final) {
@@ -216,7 +218,10 @@ function Shell() {
                 <div hidden={!fieldActive}>
                   <FieldView active={fieldActive} />
                 </div>
-                <div hidden={role !== 'farmer' || fieldActive}>
+                <div hidden={!planActive}>
+                  <PlanView active={planActive} goDraw={() => goTo('field')} />
+                </div>
+                <div hidden={role !== 'farmer' || fieldActive || planActive}>
                   <FarmerView unitId={selectedId} countyName={countyName} section={sections.farmer} active={role === 'farmer'} />
                 </div>
                 <div hidden={role !== 'procurement'}>

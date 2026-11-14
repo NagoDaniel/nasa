@@ -9,7 +9,8 @@
     "SEIFERT17": "Seifert C.A. et al. (2017). Continuous corn and soybean yield penalties across hundreds of thousands of fields. Agronomy Journal 109: 541–548.",
     "IPCC19": "IPCC (2019). Refinement to the 2006 Guidelines, Vol. 4 Ch. 11: direct N2O emission factor EF1 = 0.01 kg N2O-N per kg N applied.",
     "AR6": "IPCC AR6 WG1 (2021) Table 7.15: GWP100 of N2O = 273.",
-    "AGRO": "General agronomic literature for Central/Eastern Europe (sowing/harvest calendars, sensitive stages, rotation intervals); approximate."
+    "AGRO": "General agronomic literature for Central/Eastern Europe (sowing/harvest calendars, sensitive stages, rotation intervals); approximate.",
+    "PLANNER_APPROX": "Planner values (sowing temperature, seed rate, maturity heat sums, days from maturity to harvest): typical ranges from general agronomy guidance (e.g. FAO crop production guides, seed-company maturity ratings). Approximate, not measured here; refine with a local agronomist or seed supplier."
   },
   "assumptions": {
     "legume_precrop_yield_bonus": {
@@ -74,7 +75,32 @@
       ],
       "n_ref": "AGRO (approx)",
       "n_fixation_kg_ha": null,
-      "min_return_years": 1
+      "min_return_years": 1,
+      "planner": {
+        "sow": "spring",
+        "sow_temp_c": 10,
+        "frost_sensitive": true,
+        "seed_rate_kg_ha": [
+          18,
+          25
+        ],
+        "harvest_after_maturity_days": 14,
+        "maturity": {
+          "early": {
+            "label": "early (FAO 300)",
+            "gdd10": 1300
+          },
+          "medium": {
+            "label": "medium (FAO 400)",
+            "gdd10": 1450
+          },
+          "late": {
+            "label": "late (FAO 500)",
+            "gdd10": 1600
+          }
+        },
+        "ref": "PLANNER_APPROX"
+      }
     },
     "wheat": {
       "family": "cereal",
@@ -113,7 +139,17 @@
       ],
       "n_ref": "AGRO (approx)",
       "n_fixation_kg_ha": null,
-      "min_return_years": 1
+      "min_return_years": 1,
+      "planner": {
+        "sow": "winter",
+        "sow_window": "1–20 Oct",
+        "seed_rate_kg_ha": [
+          200,
+          250
+        ],
+        "harvest_window": "Jul",
+        "ref": "PLANNER_APPROX"
+      }
     },
     "barley": {
       "family": "cereal",
@@ -152,7 +188,17 @@
       ],
       "n_ref": "AGRO (approx)",
       "n_fixation_kg_ha": null,
-      "min_return_years": 1
+      "min_return_years": 1,
+      "planner": {
+        "sow": "winter",
+        "sow_window": "25 Sep–10 Oct",
+        "seed_rate_kg_ha": [
+          150,
+          190
+        ],
+        "harvest_window": "late Jun–Jul",
+        "ref": "PLANNER_APPROX"
+      }
     },
     "oats": {
       "family": "cereal",
@@ -192,7 +238,18 @@
       ],
       "n_ref": "AGRO (approx)",
       "n_fixation_kg_ha": null,
-      "min_return_years": 2
+      "min_return_years": 2,
+      "planner": {
+        "sow": "spring",
+        "sow_temp_c": 5,
+        "frost_sensitive": false,
+        "seed_rate_kg_ha": [
+          120,
+          150
+        ],
+        "harvest_window": "Jul–Aug",
+        "ref": "PLANNER_APPROX"
+      }
     },
     "pea": {
       "family": "legume",
@@ -235,7 +292,18 @@
         150
       ],
       "n_fix_ref": "PEOPLES09",
-      "min_return_years": 4
+      "min_return_years": 4,
+      "planner": {
+        "sow": "spring",
+        "sow_temp_c": 5,
+        "frost_sensitive": false,
+        "seed_rate_kg_ha": [
+          200,
+          260
+        ],
+        "harvest_window": "Jul",
+        "ref": "PLANNER_APPROX"
+      }
     },
     "chickpea": {
       "family": "legume",
@@ -279,7 +347,18 @@
       ],
       "n_fix_ref": "PEOPLES09",
       "min_return_years": 4,
-      "data_note": "No Romanian county statistics for chickpea; yield uses INS 'grain legumes' as a proxy (low confidence)."
+      "data_note": "No Romanian county statistics for chickpea; yield uses INS 'grain legumes' as a proxy (low confidence).",
+      "planner": {
+        "sow": "spring",
+        "sow_temp_c": 8,
+        "frost_sensitive": true,
+        "seed_rate_kg_ha": [
+          120,
+          180
+        ],
+        "harvest_window": "Jul–Aug",
+        "ref": "PLANNER_APPROX"
+      }
     },
     "soy": {
       "family": "legume",
@@ -322,7 +401,32 @@
         200
       ],
       "n_fix_ref": "PEOPLES09",
-      "min_return_years": 2
+      "min_return_years": 2,
+      "planner": {
+        "sow": "spring",
+        "sow_temp_c": 10,
+        "frost_sensitive": true,
+        "seed_rate_kg_ha": [
+          90,
+          120
+        ],
+        "harvest_after_maturity_days": 10,
+        "maturity": {
+          "early": {
+            "label": "early (MG 00)",
+            "gdd10": 1050
+          },
+          "medium": {
+            "label": "medium (MG 0)",
+            "gdd10": 1200
+          },
+          "late": {
+            "label": "late (MG I)",
+            "gdd10": 1350
+          }
+        },
+        "ref": "PLANNER_APPROX"
+      }
     },
     "sunflower": {
       "family": "oilseed (Asteraceae)",
@@ -361,7 +465,32 @@
       ],
       "n_ref": "AGRO (approx)",
       "n_fixation_kg_ha": null,
-      "min_return_years": 4
+      "min_return_years": 4,
+      "planner": {
+        "sow": "spring",
+        "sow_temp_c": 8,
+        "frost_sensitive": true,
+        "seed_rate_kg_ha": [
+          4,
+          6
+        ],
+        "harvest_after_maturity_days": 10,
+        "maturity": {
+          "early": {
+            "label": "early",
+            "gdd10": 1150
+          },
+          "medium": {
+            "label": "medium",
+            "gdd10": 1300
+          },
+          "late": {
+            "label": "late",
+            "gdd10": 1450
+          }
+        },
+        "ref": "PLANNER_APPROX"
+      }
     },
     "flax": {
       "family": "oilseed (Linaceae)",
@@ -401,7 +530,18 @@
       "n_ref": "AGRO (approx)",
       "n_fixation_kg_ha": null,
       "min_return_years": 5,
-      "data_note": "Oil flax is grown on very small areas in the region; INS figures are sparse."
+      "data_note": "Oil flax is grown on very small areas in the region; INS figures are sparse.",
+      "planner": {
+        "sow": "spring",
+        "sow_temp_c": 8,
+        "frost_sensitive": true,
+        "seed_rate_kg_ha": [
+          50,
+          70
+        ],
+        "harvest_window": "Aug",
+        "ref": "PLANNER_APPROX"
+      }
     }
   }
 }
