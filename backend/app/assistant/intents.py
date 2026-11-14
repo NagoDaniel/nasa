@@ -115,6 +115,7 @@ _LEAD = re.compile(r"^(the|la|sectiunea|section|pagina|tab)\s+")
 
 SECTION_WORDS = {
     "overview": ["overview", "summary", "prezentare", "prezentare generala", "rezumat", "home", "start"],
+    "field": ["field", "my field", "fields", "my fields", "draw field", "draw my field", "parcela", "parcela mea", "parcele", "camp", "campul meu"],
     "weather": ["weather", "weather and water", "water", "vremea", "vreme", "apa", "vreme si apa", "vremea si apa", "meteo", "indicators", "indicatori"],
     "risks": ["risks", "season risks", "seasonal risks", "hazards", "riscuri", "riscurile", "riscuri sezoniere", "risk"],
     "soil": ["soil", "soils", "sol", "solul"],
@@ -126,9 +127,9 @@ SECTION_WORDS = {
 }
 _SECTION_OF = {w: s for s, ws in SECTION_WORDS.items() for w in ws}
 SECTION_LABEL = {
-    "en": {"overview": "the overview", "weather": "Weather & water", "risks": "Season risks", "soil": "Soil", "crops": "Crops",
+    "en": {"field": "My field", "overview": "the overview", "weather": "Weather & water", "risks": "Season risks", "soil": "Soil", "crops": "Crops",
            "rotations": "Rotations", "sourcing": "the sourcing map", "recs": "Recommendations", "trends": "Trends & data"},
-    "ro": {"overview": "prezentarea generală", "weather": "Vreme și apă", "risks": "Riscuri sezoniere", "soil": "Solul", "crops": "Culturile",
+    "ro": {"field": "Parcela mea", "overview": "prezentarea generală", "weather": "Vreme și apă", "risks": "Riscuri sezoniere", "soil": "Solul", "crops": "Culturile",
            "rotations": "Rotațiile", "sourcing": "harta aprovizionării", "recs": "Recomandările", "trends": "Tendințe și date"},
 }
 

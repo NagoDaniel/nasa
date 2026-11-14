@@ -1,7 +1,7 @@
 export type Role = 'farmer' | 'procurement'
 
 export const SECTIONS = {
-  farmer: ['overview', 'weather', 'risks', 'soil', 'crops', 'rotations'],
+  farmer: ['overview', 'field', 'weather', 'risks', 'soil', 'crops', 'rotations'],
   procurement: ['sourcing', 'recs', 'trends'],
 } as const
 

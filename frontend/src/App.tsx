@@ -6,6 +6,9 @@ import { I18nProvider, useI18n } from './i18n'
 import type { Dict } from './i18n/en'
 import AssistantWidget from './assistant/AssistantWidget'
 import AreaBar from './layout/AreaBar'
+import type { DrawMode, FieldOverlays, Ring } from './map/draw'
+import { FieldLink, type FieldLinkCtx } from './state/FieldLink'
+import FieldView from './views/farmer/FieldView'
 import MapLegend from './layout/MapLegend'
 import Sidebar from './layout/Sidebar'
 import RomaniaMap, { type MapHandle, type MapPick } from './map/RomaniaMap'
@@ -15,6 +18,7 @@ import { SECTIONS, type FarmerSection, type ProcurementSection, type Role, type 
 import FarmerView from './views/farmer/FarmerView'
 import ProcurementView from './views/procurement/ProcurementView'
 
+const NO_OVERLAYS: FieldOverlays = {}
 const AOI_BOUNDS: [[number, number], [number, number]] = [[20.6, 44.4], [25.4, 47.7]]
 
 function usePersisted(key: string, initial: boolean): [boolean, (v: boolean) => void] {
@@ -128,6 +132,29 @@ function Shell() {
     setSections((prev) => ({ ...prev, [r]: s }))
   }, [])
 
+  // Drawn field ("My field" section).
+  const [drawMode, setDrawMode] = useState<DrawMode>('off')
+  const [fieldRing, setFieldRing] = useState<Ring | null>(null)
+  const [liveRing, setLiveRing] = useState<Ring | null>(null)
+  const [fieldOverlays, setFieldOverlays] = useState<FieldOverlays>({})
+  const fieldActive = role === 'farmer' && sections.farmer === 'field'
+  const onFieldChange = useCallback((r: Ring | null, final: boolean) => {
+    setLiveRing(r)
+    if (final) {
+      setFieldRing(r)
+      setDrawMode((m) => (m === 'rect' || m === 'poly' ? 'edit' : m))
+    }
+  }, [])
+  const setRingFromUi = useCallback((r: Ring | null) => {
+    setFieldRing(r)
+    setLiveRing(r)
+  }, [])
+  const fieldLink = useMemo<FieldLinkCtx>(() => ({
+    mode: drawMode, setMode: setDrawMode, ring: fieldRing, setRing: setRingFromUi, liveRing,
+    overlays: fieldOverlays, setOverlays: setFieldOverlays,
+    fitTo: (b, z) => mapRef.current?.fitBounds(b, z),
+  }), [drawMode, fieldRing, setRingFromUi, liveRing, fieldOverlays])
+
   const link = useMemo<MapLinkCtx>(
     () => ({ spec, setSpec, year, setYear, years: data?.years ?? null, setCustomLayer, setHighlight, hoveredOnMap, selectArea, goTo, command, runCommand }),
     [spec, setSpec, year, data, hoveredOnMap, selectArea, goTo, command, runCommand],
@@ -135,6 +162,7 @@ function Shell() {
 
   return (
     <MapLink.Provider value={link}>
+    <FieldLink.Provider value={fieldLink}>
       <div className={`app ${navCollapsed ? 'nav-collapsed' : ''} ${panelOpen ? '' : 'panel-closed'}`}>
         <Sidebar
           role={role} setRole={setRole}
@@ -156,6 +184,10 @@ function Shell() {
                 outsideLabel={t('outsideStudy')}
                 noDataLabel={t('noData')}
                 countyFigureLabel={t('countyFigure')}
+                drawMode={fieldActive ? drawMode : 'off'}
+                fieldRing={fieldRing}
+                onFieldChange={onFieldChange}
+                fieldOverlays={fieldActive ? fieldOverlays : NO_OVERLAYS}
               />
               <MapLegend
                 layer={layer}
@@ -181,20 +213,24 @@ function Shell() {
                 </button>
               </header>
               <div className="panel-body">
-                <div hidden={role !== 'farmer'}>
+                <div hidden={!fieldActive}>
+                  <FieldView active={fieldActive} />
+                </div>
+                <div hidden={role !== 'farmer' || fieldActive}>
                   <FarmerView unitId={selectedId} countyName={countyName} section={sections.farmer} active={role === 'farmer'} />
                 </div>
                 <div hidden={role !== 'procurement'}>
                   <ProcurementView section={sections.procurement} selectedCounty={countyCode} active={role === 'procurement'} />
                 </div>
                 <footer className="foot">
-                  {t('notEndorsed')} Data: NASA POWER, GPM IMERG, GLDAS, FIRMS, MODIS · ISRIC SoilGrids · JRC EUCROPMAP · INS TEMPO · geoBoundaries · © OpenStreetMap contributors.
+                  {t('notEndorsed')} Data: NASA POWER, GPM IMERG, GLDAS, FIRMS, MODIS, SMAP, HLS · Copernicus Sentinel-2 (ESA; EOX cloudless basemap) · ISRIC SoilGrids · JRC EUCROPMAP · INS TEMPO · geoBoundaries · © OpenStreetMap contributors.
                 </footer>
               </div>
             </section>
           </div>
         </div>
       </div>
+    </FieldLink.Provider>
     </MapLink.Provider>
   )
 }

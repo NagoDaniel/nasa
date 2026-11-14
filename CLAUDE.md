@@ -104,13 +104,17 @@ backend/
   app/routers/area.py    GET /api/units, GET /api/area/{unit} (farmer bundle), GET /api/map?kind=&key= (values per unit for colouring the map)
   app/maplayers.py       builds map layers: indicator (complete years only), agro, soil, cropshare
   app/routers/crops.py   GET /api/crops/traits, /api/crops/stats?county=, POST /api/rotations/score, GET /api/procurement?crop=
+  app/field/             drawn fields: geom (validate, WGS84 area, commune), coarse (native grid cells, SoilGrids
+                         pixels, SMAP commune), imagery (HLS + Sentinel-2 NDVI jobs, cloud masks, spike check, cache)
+  app/routers/fields.py  /api/fields CRUD, POST /fields/measure, /fields/context, /fields/vegetation (+ GET job)
   app/assistant/         AI assistant: router (POST /api/assistant/chat, GET /api/assistant/status), guard (sanitise,
                          injection patterns, rate limits, HMAC-signed replies, output cleaning, grounding check),
                          places (diacritic-insensitive area lookup), intents (deterministic replies), tools (read-only
                          data tools + UI action tools), prompts (system instruction), llm (Gemini loop), schemas
   data/                  processed JSON (committed) — see section 3
   scripts/build_boundaries.py  regenerates data/geo (uv group "scripts")
-  scripts/process/       raw -> JSON pipeline (uv group "process"); build_all.py runs every step
+  scripts/process/       raw -> JSON pipeline (uv group "process"); build_all.py runs every step (cells = native grid cells)
+  scripts/prewarm_fields.py  cache imagery for all saved fields before a demo
   scripts/download/      raw download scripts (see dataset.md)
   tests/                 pytest: scoring + grid weights (uv group "dev")
   .cache/raw/            raw downloads (gitignored; nasa-field-shift/data symlinks here)
@@ -124,6 +128,9 @@ frontend/
   src/components/        Chart (ECharts 6; onAxisClick), Collapsible (open/close panel, remembered), StatTile, Info ((i) tooltip), SourceNote + ConfidenceBadge, useAsync, format
   src/views/farmer/      FarmerView (one section at a time): Overview, IndicatorChart, SeasonEvents, SoilCard, CropMixCard, CropStatsCard, PrioritiesPanel, RotationCompare
   src/views/procurement/ ProcurementView: Sourcing table, Recs, Trends
+  src/map/draw.ts        FieldDrawer: box / corner drawing, corner editing, field overlays (cells, soil px, NDVI image, satellite)
+  src/state/FieldLink.tsx  field drawing state shared by FieldView and the map (owned by App)
+  src/views/farmer/FieldView.tsx  "My field" section (+ fieldText.ts EN/RO)
   src/assistant/         AssistantWidget (floating chat on the map), useAssistant (chat state), actions (validated
                          actions -> MapLink), text (EN/RO UI strings + AI-role explanation)
   src/map/RomaniaMap.tsx MapLibre map: controlled selection, data colouring (layer prop), hover value tooltip, highlight, flyTo handle
@@ -147,7 +154,8 @@ cd frontend && pnpm build                                                    # t
 - **Layout:** dark collapsible sidebar (role switch Farmer / Procurement, section nav, EN/RO) → area bar (county + commune pickers) → map + data panel (panel can be hidden). On phones the sidebar becomes a top strip and the map sits above the panel.
 - **One section at a time**, details in `Collapsible` panels; `SourceNote` shows the confidence badge and hides source / period / resolution / assumptions behind "Source & details". Every number keeps its (i) explanation (`i18n/explain.ts`).
 - **Map ↔ data link (keep this working):** the map is coloured by whatever the active section selects — overview tile, indicator chip, risk row/cell, soil tile, crop row, or procurement crop + score. Values come from `GET /api/map?kind=indicator|agro|soil|cropshare&key=…` (all years in one response; `app/maplayers.py`); the legend has a year slider and clicking a chart bar or table cell sets the year. Hovering the map shows the area's value; clicking selects the area; hovering a procurement row outlines the county and clicking it selects + flies there.
-- **Farmer sections:** Overview (headline tiles + this year's weather alerts), Weather & water (one indicator chart), Season risks (hazard table), Soil, Crops (crop mix + county yields), Rotations (priorities + comparison).
+- **Farmer sections:** Overview (headline tiles + this year's weather alerts), My field (draw/edit/save a field, see below), Weather & water (one indicator chart), Season risks (hazard table), Soil, Crops (crop mix + county yields), Rotations (priorities + comparison).
+- **My field — resolution honesty (keep):** each value is labelled by kind. *Measured on the field*: HLS 30 m / Sentinel-2 10 m NDVI from pixels whose centre is inside the outline (all_touched only if none). *Model pixel*: SoilGrids 250 m. *Surrounding-area estimate*: IMERG/POWER/GLDAS = value of the native cell (`data/cells/*.json`) with its outline and "% of cell"; never interpolate or downscale, and list each cell when a field crosses cells. *Commune average*: SMAP. Every image shows date, sensor, tile, scene cloud, pixel count, clear %, status (clear / partly cloudy / cloudy / suspect / no data / error). Imagery is read live (COG windows via GDAL, Earthdata login for HLS) in background jobs, cached in `backend/.cache/fields/` (`VERSION` in imagery.py invalidates). Earth Search S2: if `earthsearch:boa_offset_applied` is true the −0.1 offset is already in the pixels — do not apply it again.
 - **AI assistant (requirement 11):** floating chat on the map. Role = *explain the dashboard's numbers and drive the dashboard* (select/zoom area, open section, colour map by layer + year, pick procurement crop); it does **not** forecast or create data. Deterministic first: place names, "open <section>", greetings/help are plain code (`intents.py`); only other questions go to **Gemini** (`S2F_GEMINI_API_KEY` in `backend/.env`, model `S2F_GEMINI_MODEL`, default gemini-3.8-flash), which may only call the read-only tools in `assistant/tools.py`. Actions reach the views through `MapLink.runCommand` (FarmerView/ProcurementView apply them by `seq`; App waits for the layer's data before setting a requested year).
 - **Assistant safety (keep all layers):** 500 chars/message, ≤ 6 history turns, 8 KB body limit (middleware in main.py), per-IP 6/min + 60/day and a global daily LLM budget (in-memory → run uvicorn with one worker), concurrency 2, injection regexes EN+RO before any LLM call, assistant history turns must carry the server's HMAC signature, system prompt has a canary (leak → refusal), replies stripped of links/HTML/markdown and rendered as plain text, numbers not found in tool results are flagged (`unverified`). Never add tools that write, fetch URLs or touch the DB. Tests: `backend/tests/test_assistant.py` (fake model, no key needed).
 - **Procurement sections:** Sourcing map (county table), Recommendations, Trends & data.
@@ -181,6 +189,7 @@ cd frontend && pnpm build                                                    # t
 | `crops/ins_stats.json` | INS area / production / yield per county (+ RO total), 2015–2025; grain-legume yield derived as production ÷ area |
 | `crops/cropmap.json` | EUCROPMAP 2018 / 2022 ha per class per unit (counted at 100 m) |
 | `crops/crop_traits.json` | hand-curated crop traits with references (FAO, Ecocrop, IPCC, Peoples 2009, Preissel 2015…) + scoring assumptions |
+| `cells/<name>.json` | native grid cells (lat/lon centres, dlat/dlon, monthly values) of imerg_precip, power_precip, power_tmax, power_heat_days, gldas_rootmoist — used for drawn fields |
 | `land/terrain.json` | SRTM elevation / slope (all land + cropland) and ESA WorldCover 2021 land-cover shares, units covered ≥ 95 % by the tiles |
 
 - Gridded data → units: area-weighted overlap of grid cells (`scripts/process/common.py: grid_weights/aggregate`); rasters → units: commune label raster (`zonal.py`), counties = union of their communes.
@@ -188,7 +197,7 @@ cd frontend && pnpm build                                                    # t
 - Hazard thresholds (`app/scoring/hazards.py`): heat ones physiological; rain / wet-day / dry-spell ones ≈ regional 75th percentile 2015–2025. They are shown in the UI.
 - **Two raw folders:** `backend/.cache/raw/` (2015–2025 AOI clips, `dataset.md`) and `<repo>/data/` (gitignored, 2021-11 – 2026-10 Alba-Iulia box + MODIS h19v04 tile + global GLDAS/GRACE, `dataset_dani.md`; env `S2F_RAW_EXTRA_DIR`). Steps `modis`, `smap`, `grace`, `terrain` read only `<repo>/data`. **The local `.cache/raw` may be a partial copy** — don't rerun `imerg`, `firms`, `soil`, `cropmap` unless the full set is there; `gldas` merges with the existing JSON, `power` and `agro_yearly` are safe.
 - **2026:** POWER (Jan–Oct) only for 9 cells around Alba Iulia → `agro_yearly` has 2026 for ~260 units (AB, SB counties); GLDAS ends 2026-07, so 2026 water balance / summer soil-moisture z are empty. Procurement "this season" = each county's latest year with data.
-- **Known gaps:** GLDAS 2015-01 raw file is a bad download (holds IMERG) → empty month; IMERG Final ends 2025-09; SMAP only covers ~100 units around Alba Iulia (quality flag drops forested cells) and was still downloading (rerun `build_all.py smap`); MODIS cropland series missing for Vâlcea + units outside WorldCover tiles; ECOSTRESS, HLS, MOD13Q1 250 m not processed. Chickpea has no INS statistics (uses grain legumes as proxy, low confidence). EUCROPMAP county totals differ from INS by up to 30–50% → use INS for volumes.
+- **Known gaps:** GLDAS 2015-01 raw file is a bad download (holds IMERG) → empty month; IMERG Final ends 2025-09; SMAP only covers ~100 units around Alba Iulia (quality flag drops forested cells) and was still downloading (rerun `build_all.py smap`); MODIS cropland series missing for Vâlcea + units outside WorldCover tiles; ECOSTRESS and MOD13Q1 250 m not processed; HLS and Sentinel-2 are read live only for drawn fields. Chickpea has no INS statistics (uses grain legumes as proxy, low confidence). EUCROPMAP county totals differ from INS by up to 30–50% → use INS for volumes.
 
 Raw datasets (NASA and supplementary) are downloaded to `backend/.cache/raw/` (gitignored). **Read `dataset.md` before touching raw data**: it lists every dataset's files, structure, units and quirks.
 

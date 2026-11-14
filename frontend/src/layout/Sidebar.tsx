@@ -8,6 +8,7 @@ const ICONS: Record<Section, ReactNode> = {
   overview: <><rect x="3" y="3" width="6" height="6" rx="1" {...P} /><rect x="11" y="3" width="6" height="6" rx="1" {...P} /><rect x="3" y="11" width="6" height="6" rx="1" {...P} /><rect x="11" y="11" width="6" height="6" rx="1" {...P} /></>,
   weather: <><path d="M6 12a3.5 3.5 0 0 1 .6-6.9A4.5 4.5 0 0 1 15 6.5 3 3 0 0 1 14.5 12z" {...P} /><path d="M7 15l-.8 2M10.5 15l-.8 2M14 15l-.8 2" {...P} /></>,
   risks: <><path d="M10 3l7.5 13h-15z" {...P} /><path d="M10 8v4M10 14.2v.3" {...P} /></>,
+  field: <><path d="M4 5l5-2 7 3-1 10-6 1-5-4z" {...P} /><path d="M4 5l5 4 7-3M9 9v8" {...P} /></>,
   soil: <><path d="M10 3l7 3.5-7 3.5-7-3.5z" {...P} /><path d="M3 10l7 3.5 7-3.5M3 13.5L10 17l7-3.5" {...P} /></>,
   crops: <><path d="M10 17V9" {...P} /><path d="M10 11C10 7 7 5.5 3.5 5.5 3.5 9 6 11 10 11zM10 9c0-3 2.2-5 6.5-5C16.5 7 14 9 10 9z" {...P} /></>,
   rotations: <><path d="M16 10a6 6 0 0 1-10.5 4M4 10a6 6 0 0 1 10.5-4" {...P} /><path d="M14.5 3v3h-3M5.5 17v-3h3" {...P} /></>,

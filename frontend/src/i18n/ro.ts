@@ -80,6 +80,7 @@ export const ro: Dict = {
   noData: 'fără date',
   countyFigure: 'cifră la nivel de județ',
   // layout, sections and overview
+  nav_field: 'Parcela mea',
   nav_overview: 'Rezumat',
   nav_weather: 'Vreme și apă',
   nav_risks: 'Riscuri de sezon',
@@ -89,6 +90,7 @@ export const ro: Dict = {
   nav_sourcing: 'Harta aprovizionării',
   nav_recs: 'Recomandări',
   nav_trends: 'Evoluție și date',
+  intro_field: 'Desenați parcela (trageți un dreptunghi sau dați clic pe colțuri) ca să vedeți vegetația măsurată din satelit pe ea și datele meteo mai grosiere pentru zona din jur.',
   intro_overview: 'Datele-cheie pentru această zonă. Faceți clic pe o casetă ca să o vedeți pe hartă.',
   intro_weather: 'Cum s-au schimbat ploaia, căldura și apa din sol între 2015 și 2025.',
   intro_risks: 'Anii în care vremea a lovit culturile într-un moment sensibil.',
