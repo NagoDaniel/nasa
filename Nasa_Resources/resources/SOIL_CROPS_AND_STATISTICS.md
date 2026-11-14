@@ -15,7 +15,7 @@
 | Crop-water concepts | [FAO crop water needs](https://www.fao.org/4/s2022e/s2022e07.htm) | Calibrate crop-stage assumptions locally |
 | Seasonal timing | [JRC ASAP calendars](https://agricultural-production-hotspots.ec.europa.eu/download.php) | Check Romanian crop coverage and local applicability |
 
-## Access findings
+## Access findings 
 
 SoilGrids' documentation reports its REST API as paused. Use the documented WCS or WebDAV routes and retain the release information. The file directory was retrieved; complete raster downloads were not tested.
 
