@@ -150,7 +150,7 @@ def county_metrics(crop: str, code: str, ins_c: dict, agro: dict, traits: dict, 
 
 
 def procurement(crop: str, counties: dict[str, str], ins: dict, agro_all: dict, traits: dict,
-                fires_all: dict, ndvi: dict | None = None) -> dict[str, Any]:
+                fires_all: dict, ndvi: dict | None = None, outlook: dict | None = None) -> dict[str, Any]:
     if crop not in traits["crops"]:
         raise ValueError(f"unknown crop {crop}")
     out = {}
@@ -160,12 +160,15 @@ def procurement(crop: str, counties: dict[str, str], ins: dict, agro_all: dict, 
         out[code] = {"name": name, **m}
 
     recs = recommendations(crop, out, ins, agro_all, traits, counties)
+    if outlook:
+        recs = outlook_recs(crop, outlook, counties) + recs
     t = traits["crops"][crop]
     return {
         "crop": crop,
         "proxy": _proxy(crop) if crop == "chickpea" else None,
         "counties": out,
         "recommendations": recs,
+        "outlook": outlook,
         "assumptions": [
             "Availability = 100 × (1 − 0.5 × min(1, yield CV / 40%) − 0.5 × share of hazard years); production volume is shown alongside.",
             "Quality = 100 × (1 − share of years in which the crop's sensitive window was hit; 2015–2025, plus 2026 where NASA POWER has 2026 data).",
@@ -291,3 +294,36 @@ def recommendations(crop: str, data: dict, ins: dict, agro_all: dict, traits: di
                 ],
             })
     return recs
+
+
+def outlook_recs(crop: str, outlook: dict, counties: dict) -> list[dict]:
+    """Idea 5: turn the season yield outlook into a buying signal (only from reliable models)."""
+    reg = outlook.get("region")
+    if not reg:
+        return []
+    fc = {c: outlook["counties"][c]["forecast"] for c in reg["counties"]}
+    pct = round(100 * (reg["production_t"] / reg["normal_t"] - 1)) if reg["normal_t"] else None
+    low = [counties[c] for c, f in fc.items() if f["supply"]["vs_normal_pct"] <= -10]
+    names = "the 8 study counties" if len(reg["counties"]) == len(counties) else ", ".join(counties[c] for c in reg["counties"])
+    if pct is not None and pct <= -10:
+        title = f"Expect less {crop} from {names} in {reg['year']}"
+        action = "Secure volume early or shift part of the purchase to other counties / an alternative ingredient."
+    elif pct is not None and pct >= 10:
+        title = f"Good {reg['year']} {crop} outlook in {names}"
+        action = "A good moment to contract volume from these counties."
+    else:
+        title = f"Normal {reg['year']} {crop} outlook in {names}"
+        action = "No change to the buying plan needed from the weather signal."
+    drivers = sorted((x for f in fc.values() for x in f["contributions"]), key=lambda x: x["effect_pct"])
+    worst = drivers[0] if drivers and drivers[0]["effect_pct"] < -3 else None
+    sig = "" if reg.get("signal") == "strong" else " The weather signal is weak (the model beats a trend-only guess by only 5–10 %), so treat this as a hint."
+    return [{
+        "type": "outlook", "title": title,
+        "text": (f"Weather-based forecast for {names}: about {reg['production_t']:,} t "
+                 f"(likely {reg['low_t']:,}–{reg['high_t']:,} t) vs {reg['normal_t']:,} t in a normal year ({pct:+d} %)."
+                 + (f" Main drag: {worst['label']} ({worst['effect_pct']:+.0f} %)." if worst else "")
+                 + (f" Weakest: {', '.join(low)}." if low and len(low) < len(fc) else "") + " " + action
+                 + sig),
+        "numbers": {"region": reg},
+        "assumptions": outlook["method"][-2:],
+    }]

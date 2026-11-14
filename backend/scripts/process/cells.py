@@ -39,6 +39,8 @@ def _write(name: str, meta: dict, keys: list[str], lat, lon, dlat: float, dlon: 
 
 def _power() -> None:
     dates, lat, lon, a = power.load_power_grid()
+    keep = dates >= power.pd.Timestamp(power.SERIES_START)  # same period as the unit series (loader now holds 2000–2026)
+    dates, a = dates[keep], {k: v[keep] for k, v in a.items()}
     base = {"source": power.SOURCE, "resolution": power.RES, "last_day": dates[-1].strftime("%Y-%m-%d")}
     tmax = a["T2M_MAX"]
     defs = {

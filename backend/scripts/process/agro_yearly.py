@@ -60,6 +60,8 @@ INDICATORS = {
                       "Water in the root zone during the critical summer months."),
     "rootmoist_jja_z": ("Root-zone soil moisture anomaly, Jun–Aug", "z-score", GLDAS_SRC, "Jun–Aug",
                         "Compared with 2015–2025 (unit mean / std): below −1 = clearly drier summer than usual."),
+    "rootmoist_jj_z": ("Root-zone soil moisture anomaly, Jun–Jul", "z-score", GLDAS_SRC, "Jun–Jul",
+                       "Early-summer version of the Jun–Aug anomaly; exists before August, so the season forecast can use it."),
 }
 
 
@@ -79,12 +81,12 @@ def _longest_run(dry: np.ndarray) -> np.ndarray:
     return best
 
 
-def power_part() -> dict[str, np.ndarray]:
+def power_part(years: list[int] = YEARS) -> dict[str, np.ndarray]:
     dates, _, _, a = load_power_grid()
     tmax, tmin, pr, rh, t = a["T2M_MAX"], a["T2M_MIN"], a["PRECTOTCORR"], a["RH2M"], a["T2M"]
-    shape = (len(YEARS),) + tmax.shape[1:]
+    shape = (len(years),) + tmax.shape[1:]
     out = {k: np.full(shape, np.nan) for k in INDICATORS if INDICATORS[k][2] == POWER_SRC}
-    for i, y in enumerate(YEARS):
+    for i, y in enumerate(years):
         ja = _window(dates, y, (7, 1), (8, 31))
         fl = _window(dates, y, (5, 15), (6, 30))
         fr = _window(dates, y, (4, 15), (5, 31))
@@ -129,11 +131,11 @@ def gldas_part() -> dict[str, dict[str, np.ndarray]]:
     months = np.array([int(k[5:7]) for k in keys])
     years = np.array([int(k[:4]) for k in keys])
     f = lambda v: np.array([np.nan if x is None else x for x in v], dtype=float)  # noqa: E731
-    out = {k: {} for k in ("et_apr_sep", "water_balance_apr_sep", "rootmoist_jja", "rootmoist_jja_z")}
+    out = {k: {} for k in ("et_apr_sep", "water_balance_apr_sep", "rootmoist_jja", "rootmoist_jja_z", "rootmoist_jj_z")}
     base = np.array([BASELINE[0] <= y <= BASELINE[1] for y in YEARS])
     for uid in et_u:
         et, rain, rm = f(et_u[uid]), f(rain_u[uid]), f(rm_u[uid])
-        e, w, r = (np.full(len(YEARS), np.nan) for _ in range(3))
+        e, w, r, r2 = (np.full(len(YEARS), np.nan) for _ in range(4))
         for i, y in enumerate(YEARS):
             gs = (years == y) & (months >= 4) & (months <= 9)
             jja = (years == y) & (months >= 6) & (months <= 8)
@@ -142,17 +144,22 @@ def gldas_part() -> dict[str, dict[str, np.ndarray]]:
                 w[i] = rain[gs].sum() - et[gs].sum()
             if jja.sum() == 3 and np.isfinite(rm[jja]).all():
                 r[i] = rm[jja].mean()
+            jj = (years == y) & (months >= 6) & (months <= 7)
+            if jj.sum() == 2 and np.isfinite(rm[jj]).all():
+                r2[i] = rm[jj].mean()
         with np.errstate(invalid="ignore", divide="ignore"):
             z = (r - np.nanmean(r[base])) / np.nanstd(r[base])
+            z2 = (r2 - np.nanmean(r2[base])) / np.nanstd(r2[base])
         out["et_apr_sep"][uid], out["water_balance_apr_sep"][uid] = e, w
         out["rootmoist_jja"][uid], out["rootmoist_jja_z"][uid] = r, z
+        out["rootmoist_jj_z"][uid] = z2
     return out
 
 
 def main() -> None:
     parts = {**power_part(), **gldas_part()}
     unit_ids = next(iter(parts.values())).keys()
-    units = {u: {k: values(parts[k][u], 1 if k != "rootmoist_jja_z" else 2) for k in INDICATORS} for u in unit_ids}
+    units = {u: {k: values(parts[k][u], 2 if k.endswith("_z") else 1) for k in INDICATORS} for u in unit_ids}
     write_json(
         "derived/agro_yearly.json",
         {

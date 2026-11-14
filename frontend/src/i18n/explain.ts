@@ -64,6 +64,7 @@ const en = {
     range: 'Big number = median of the area (half the area is above, half below). Small numbers = 10th–90th percentile: 80% of the area lies in this range.',
     texture: 'Soil texture class from the clay / sand / silt mix (USDA triangle). Loams are easiest to work; clay soils are fertile but heavy.',
   },
+  outlook: 'Expected yield for this season in the county, from a simple statistical model: how far county yields moved from normal with the weather in the crop’s sensitive period (2015–2025, NASA POWER + GLDAS). Tested by predicting each past year without seeing it; shown only when it beats assuming a normal year. A range, not a promise.',
   cropStats: 'Average yield per hectare in the county for each year, in kg/ha (1,000 kg/ha = 1 t/ha), from the Romanian statistics institute (INS). Gaps mean no figure was reported.',
   cropMix: {
     ha: 'Hectares of each crop in the area according to the EU satellite crop map (1 ha = 100 m × 100 m). Satellite classification, so indicative.',
@@ -96,6 +97,7 @@ const en = {
     confidence: 'High: the county produces enough (≥ 1,000 t) for stable statistics. Medium: 100–1,000 t. Low: very small production or a stand-in dataset (chickpea).',
     choropleth: 'Counties coloured by the selected score for the selected crop: red = weak, green = strong (0–30 / 30–50 / 50–70 / 70–100). Grey counties are outside the study area.',
     productionChart: 'Production of the crop per county and year, in tonnes, stacked: the height of a bar is the 8-county total.',
+    rec_outlook: 'Weather-based forecast of this season’s production (latest area × forecast yield range) for the counties that have this season’s weather data, compared with a normal year. Only from crop models that beat a normal-year guess in testing.',
     rec_spread: 'r is the correlation of the two counties’ yearly yields, 2015–2025: 1 = they always rise and fall together, 0 = unrelated, negative = opposite. The lower r, the less likely both fail in the same year.',
     rec_quality: 'Lists which hazards hit which counties in the latest season. Hazard thresholds are listed under “Data, assumptions and sources”.',
     rec_alternative: 'Average of availability and quality across the counties that grow the crop, compared with the selected crop. Suggested only when the alternative is at least 5 points better.',
@@ -165,6 +167,7 @@ const ro: Explain = {
     range: 'Numărul mare = mediana zonei (jumătate din zonă e peste, jumătate sub). Numerele mici = percentilele 10–90: 80% din zonă se află în acest interval.',
     texture: 'Clasa de textură după amestecul de argilă / nisip / praf (triunghiul USDA). Solurile lutoase se lucrează cel mai ușor; cele argiloase sunt fertile, dar grele.',
   },
+  outlook: 'Producția așteptată în acest sezon în județ, dintr-un model statistic simplu: cât s-au abătut producțiile județului de la normal în funcție de vremea din perioada sensibilă a culturii (2015–2025, NASA POWER + GLDAS). Testat prezicând fiecare an trecut fără să-l vadă; afișat doar când e mai bun decât presupunerea unui an normal. Un interval, nu o promisiune.',
   cropStats: 'Producția medie la hectar în județ pentru fiecare an, în kg/ha (1.000 kg/ha = 1 t/ha), de la Institutul Național de Statistică (INS). Golurile înseamnă că nu s-a raportat o cifră.',
   cropMix: {
     ha: 'Hectarele fiecărei culturi în zonă după harta satelitară a culturilor din UE (1 ha = 100 m × 100 m). Clasificare din satelit, deci orientativă.',
@@ -197,6 +200,7 @@ const ro: Explain = {
     confidence: 'Ridicată: județul produce destul (≥ 1.000 t) pentru statistici stabile. Medie: 100–1.000 t. Scăzută: producție foarte mică sau date înlocuitoare (năut).',
     choropleth: 'Județele colorate după scorul ales pentru cultura aleasă: roșu = slab, verde = puternic (0–30 / 30–50 / 50–70 / 70–100). Județele gri sunt în afara zonei de studiu.',
     productionChart: 'Producția culturii pe județ și an, în tone, stivuită: înălțimea unei bare este totalul celor 8 județe.',
+    rec_outlook: 'Prognoză pe baza vremii pentru producția acestui sezon (suprafața recentă × intervalul de producție la hectar) pentru județele cu date meteo din acest sezon, comparată cu un an normal. Doar din modele care au fost mai bune decât un an normal la testare.',
     rec_spread: 'r este corelația producțiilor anuale la hectar ale celor două județe, 2015–2025: 1 = cresc și scad mereu împreună, 0 = fără legătură, negativ = invers. Cu cât r e mai mic, cu atât e mai puțin probabil ca ambele să eșueze în același an.',
     rec_quality: 'Arată ce riscuri au lovit ce județe în ultimul sezon. Pragurile de risc sunt listate la „Date, ipoteze și surse”.',
     rec_alternative: 'Media disponibilității și calității în județele care cultivă planta, comparată cu cultura aleasă. Se propune doar dacă alternativa e cu cel puțin 5 puncte mai bună.',

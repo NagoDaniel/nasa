@@ -104,3 +104,36 @@ def test_unknown_crop_rejected():
 def test_commune_has_lower_confidence():
     r = score_rotation(ctx(unit={"id": "AB-0001", "kind": "commune"}), ["maize", "wheat", "maize"], EQUAL)
     assert r["confidence"]["level"] == "low"
+
+
+def test_forecast_learns_weather_effect_and_gates_on_skill():
+    """Synthetic: yield drops 2 % per hot day -> model recovers it; pure noise -> no weather signal."""
+    import random
+
+    from app.scoring.forecast import forecast
+
+    rnd = random.Random(1)
+    years = list(range(2000, 2027))
+    counties = {f"C{i}": f"County {i}" for i in range(8)}
+    traits = {"crops": {"maize": {"sensitive": {"hazards": ["heat35_jul_aug"]}}}}
+    meta = {"heat35_jul_aug": {"label": "Very hot days", "unit": "days"}}
+    ins = {"years": list(range(2015, 2026)), "counties": {c: {"maize": {"area_ha": [1000.0] * 11, "production_t": [5000.0] * 11}} for c in counties}}
+
+    def build(signal: bool):
+        weather, yields = {}, {}
+        for c in counties:
+            heat = [rnd.uniform(0, 10) for _ in years]
+            yields[c] = {"maize": [5000 * (1 - (0.02 * h if signal else 0) + rnd.gauss(0, 0.02 if signal else 0.15)) for h in heat[:-1]] + [None]}
+            weather[c] = {"heat35_jul_aug": heat}
+        inputs = {"years": years, "indicators": meta, "counties": weather, "yields": yields}
+        return forecast("maize", counties, ins, inputs, traits)
+
+    good = build(True)
+    eff = good["model"]["predictors"][0]["effect_pct_per_unit"]
+    assert -2.6 < eff < -1.4 and good["model"]["signal"] == "strong"
+    f = good["counties"]["C0"]["forecast"]
+    iv = f["intervals_kg_ha"]
+    assert f["year"] == 2026 and iv["90"][0] <= iv["80"][0] <= iv["50"][0] <= f["yield_kg_ha"] <= iv["50"][1] <= iv["80"][1] <= iv["90"][1]
+    assert 70 <= good["coverage_80_pct"] <= 90
+    assert good["region"] is not None
+    assert build(False)["model"]["signal"] == "none"

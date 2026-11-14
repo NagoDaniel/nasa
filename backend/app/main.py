@@ -8,7 +8,7 @@ from fastapi.responses import ORJSONResponse
 from .assistant import router as assistant
 from .config import settings
 from .db import init_db
-from .routers import area, crops, fields, geo, health, nasa
+from .routers import area, crops, fields, geo, health, nasa, planner
 
 
 @asynccontextmanager
@@ -31,11 +31,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (health.router, geo.router, nasa.router, area.router, crops.router, fields.router, assistant.router):
+for r in (health.router, geo.router, nasa.router, area.router, crops.router, fields.router, assistant.router, planner.router):
     app.include_router(r, prefix="/api")
 
 
-BODY_LIMITS = {"/api/assistant": 8 * 1024, "/api/fields": 64 * 1024}
+BODY_LIMITS = {"/api/assistant": 8 * 1024, "/api/fields": 64 * 1024, "/api/planner": 32 * 1024}
 
 
 @app.middleware("http")

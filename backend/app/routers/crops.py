@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from .. import datasets as ds
+from ..scoring.forecast import forecast
 from ..scoring.procurement import procurement
 from ..scoring.rotation import score_rotation
 
@@ -63,4 +64,15 @@ def procurement_view(crop: str) -> dict[str, Any]:
     if crop not in traits["crops"]:
         raise HTTPException(404, f"Unknown crop '{crop}'")
     counties, agro_all, fires, ndvi = ds.procurement_inputs()
-    return procurement(crop, counties, ds.ins(), agro_all, traits, fires, ndvi)
+    outlook = forecast(crop, counties, ds.ins(), ds.store.get("derived/forecast_inputs.json"), traits)
+    return procurement(crop, counties, ds.ins(), agro_all, traits, fires, ndvi, outlook)
+
+
+@router.get("/forecast")
+def forecast_view(crop: str) -> dict[str, Any]:
+    """Season yield outlook per county for one crop (ridge regression on weather, tested leave-one-year-out)."""
+    traits = ds.traits()
+    if crop not in traits["crops"]:
+        raise HTTPException(404, f"Unknown crop '{crop}'")
+    counties = {u["id"]: u["name"] for u in ds.units_index().values() if u["kind"] == "county"}
+    return forecast(crop, counties, ds.ins(), ds.store.get("derived/forecast_inputs.json"), traits)
