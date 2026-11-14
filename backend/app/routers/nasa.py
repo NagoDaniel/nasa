@@ -2,6 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from ..i18n import localize
 from ..json_store import store
 
 router = APIRouter(prefix="/nasa", tags=["nasa"])
@@ -24,7 +25,7 @@ def get_dataset(dataset: str, unit: str | None = None) -> Any:
     series = data.get("units", {}).get(unit)
     if series is None:
         raise HTTPException(404, f"No data for unit '{unit}' in '{dataset}'")
-    return {k: v for k, v in data.items() if k != "units"} | {"unit": unit, "series": series}
+    return localize({k: v for k, v in data.items() if k != "units"} | {"unit": unit, "series": series})
 
 
 @router.get("/crops/{direction}", tags=["crops"])

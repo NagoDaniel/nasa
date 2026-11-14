@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .. import i18n as I
 from .hazards import HAZARDS, clean, crop_hazard_keys, cv, hazard_years, median, percentile
 
 SUB = ("yield", "water", "soil", "risk")
@@ -47,7 +48,7 @@ class Context:
 def _r(x: float | None, nd: int = 0) -> str:
     if x is None:
         return "n/a"
-    return f"{x:,.{nd}f}"
+    return I.num(x, nd)
 
 
 def _clamp(x: float) -> float:
@@ -57,10 +58,10 @@ def _clamp(x: float) -> float:
 def yield_series(ctx: Context, crop: str) -> tuple[list, list, str]:
     """County and Romania yield series; chickpea falls back to grain legumes."""
     key = crop if crop in ctx.ins_county else None
-    note = "INS TEMPO AGR110A"
+    note = I.t("ins_note")
     if crop == "chickpea" or key is None:
         key = "grain_legumes"
-        note = "INS TEMPO — 'grain legumes' (yield = production ÷ area) used as proxy; no chickpea statistics"
+        note = I.t("ins_proxy_note")
     c = (ctx.ins_county.get(key) or {}).get("yield_kg_ha") or []
     r = (ctx.ins_ro.get(key) or {}).get("yield_kg_ha") or []
     return c, r, note
@@ -119,16 +120,16 @@ def score_rotation(ctx: Context, crops: list[str], priorities: dict[str, float],
         prev = crops[i - 1] if i > 0 else (prev_crop or crops[-1])  # default: year 1 follows the last year
         mult = 1.0
         effects = []
-        wrap = (" (last year's crop)" if prev_crop else " (rotation repeats)") if i == 0 else ""
+        wrap = I.t("rot_wrap_last" if prev_crop else "rot_wrap_repeat") if i == 0 else ""
         if t["family"] == "cereal" and ctx.traits["crops"][prev]["legume"]:
             mult += A["legume_precrop_yield_bonus"]["value"]
-            effects.append(f"+{A['legume_precrop_yield_bonus']['value']:.0%} after {prev}{wrap}")
+            effects.append(I.t("rot_after_legume", p=I.pct(A["legume_precrop_yield_bonus"]["value"]), prev=I.crop(prev), wrap=wrap))
         if prev == crop:
             mult -= A["repeat_penalty"]["value"]
-            effects.append(f"−{A['repeat_penalty']['value']:.0%} same crop as the year before{wrap}")
+            effects.append(I.t("rot_repeat", p=I.pct(A["repeat_penalty"]["value"]), wrap=wrap))
         if p["ph_ok"] is False:
             mult -= 0.05
-            effects.append("−5% soil pH outside optimum")
+            effects.append(I.t("rot_ph"))
         base = 60 * p["yield_ratio"] if p["yield_ratio"] else 50
         ys = _clamp(base * mult)
         ws = _clamp(100 * min(1.0, (p["supply_dry"] or 0) / p["need"])) if p["supply_dry"] else 50
@@ -153,39 +154,40 @@ def score_rotation(ctx: Context, crops: list[str], priorities: dict[str, float],
         seen.add(crop)
         p = profiles[crop]
         t = p["trait"]
+        cn = I.crop(crop)
         factors["yield"].append(Factor(
-            f"{crop}: local yield vs Romania (median 2015–2025)",
-            f"{_r(p['yield_median'])} vs {_r(p['yield_ro_median'])} kg/ha ({_r(p['yield_ratio'], 2)}×)" if p["yield_ratio"] else "no statistics",
+            I.t("f_yield_label", crop=cn),
+            I.t("f_yield_value", c=_r(p["yield_median"]), r=_r(p["yield_ro_median"]), x=_r(p["yield_ratio"], 2)) if p["yield_ratio"] else I.t("f_no_stats"),
             "+" if (p["yield_ratio"] or 1) >= 1 else "−", p["ins_note"],
-            "Score 60 = Romanian average; scales with the ratio.",
+            I.t("f_yield_assume"),
         ))
         if p["ph_ok"] is not None:
             factors["yield"].append(Factor(
-                f"{crop}: soil pH fit", f"pH {p['ph_median']} vs optimum {t['ph_opt'][0]}–{t['ph_opt'][1]}",
-                "·" if p["ph_ok"] else "−", f"SoilGrids 2.0 (median 0–30 cm); optimum {t['ph_ref']}",
-                None if p["ph_ok"] else "−5% yield assumed without liming.",
+                I.t("f_ph_label", crop=cn), I.t("f_ph_value", ph=_r(p["ph_median"], 1), lo=_r(t["ph_opt"][0], 1), hi=_r(t["ph_opt"][1], 1)),
+                "·" if p["ph_ok"] else "−", I.t("f_ph_source", ref=t["ph_ref"]),
+                None if p["ph_ok"] else I.t("f_ph_assume"),
             ))
         factors["water"].append(Factor(
-            f"{crop}: water need vs dry-year rain (Apr–Sep)",
-            f"needs {t['water_need_mm'][0]}–{t['water_need_mm'][1]} mm; dry-year rain {_r(p['supply_dry'])} mm (average {_r(p['supply_mean'])} mm)",
+            I.t("f_water_label", crop=cn),
+            I.t("f_water_value", lo=t["water_need_mm"][0], hi=t["water_need_mm"][1], dry=_r(p["supply_dry"]), avg=_r(p["supply_mean"])),
             "+" if (p["supply_dry"] or 0) >= p["need"] else "−",
-            f"Need: {t['water_ref']}. Rain: NASA POWER, driest 20% of 2015–2025.",
-            "Rain-fed; winter crops also use soil water stored over winter, so their water score is conservative.",
+            I.t("f_water_source", ref=I.L(t["water_ref"])),
+            I.t("f_water_assume"),
         ))
-        hz_txt = "; ".join(f"{y}: {', '.join(HAZARDS[k].text for k in ks)}" for y, ks in p["hazard_years"].items()) or "none"
+        hz_txt = "; ".join(f"{y}: {', '.join(HAZARDS[k].text for k in ks)}" for y, ks in p["hazard_years"].items()) or I.t("f_none")
         factors["risk"].append(Factor(
-            f"{crop}: sensitive period ({t['sensitive']['stage']}, {t['sensitive']['window']}) hit by hazards",
-            f"{len(p['hazard_years'])} of {p['n_years']} years — {hz_txt}",
+            I.t("f_risk_label", crop=cn, stage=I.L(t["sensitive"]["stage"]), window=I.months(t["sensitive"]["window"])),
+            I.t("f_risk_value", n=len(p["hazard_years"]), m=p["n_years"], list=hz_txt),
             "−" if p["hazard_years"] else "+",
-            "NASA POWER + GLDAS yearly indicators",
-            "Hazard thresholds: " + "; ".join(HAZARDS[k].text for k in p["hazard_keys"]) + ". " + t["sensitive"]["quality"],
+            I.t("f_risk_source"),
+            I.t("f_thresholds", list="; ".join(HAZARDS[k].text for k in p["hazard_keys"])) + " " + I.L(t["sensitive"]["quality"]),
         ))
         if p["yield_cv"] is not None:
             factors["risk"].append(Factor(
-                f"{crop}: year-to-year yield swing in the county",
-                f"coefficient of variation {p['yield_cv']:.0%}",
+                I.t("f_cv_label", crop=cn),
+                I.t("f_cv_value", cv=I.pct(p["yield_cv"])),
                 "−" if p["yield_cv"] > 0.2 else "·", p["ins_note"],
-                "Risk score = 100 × (1 − (0.6 × hazard-year share + 0.4 × min(1, CV / 40%))).",
+                I.t("f_cv_assume"),
             ))
 
     # ---- soil health (rotation level)
@@ -204,31 +206,30 @@ def score_rotation(ctx: Context, crops: list[str], priorities: dict[str, float],
         # cyclic distance to the next time the same crop is grown (rotation repeats)
         dists = [((pos[(k + 1) % len(pos)] - p) % n) or n for k, p in enumerate(pos)]
         if min(dists) < gap:
-            violations.append(f"{c} returns after {min(dists)} year(s) (needs ≥ {gap})")
+            violations.append(I.t("f_interval_bad", crop=I.crop(c), n=min(dists), gap=gap))
     int_pts = max(0, 20 - 10 * len(violations))
     soil_score = _clamp(leg_pts + div_pts + win_pts + int_pts)
     factors["soil"] += [
-        Factor("Grain legume years", f"{legumes} of {n}", "+" if legumes else "−", "Crop traits (PEOPLES09)",
-               "0 legumes = 0, 1 = 20, ≥ 2 = 30 points. Legumes fix nitrogen and break cereal disease cycles."),
-        Factor("Crop families", f"{len(families)}: {', '.join(sorted(families))}", "+" if len(families) >= 3 else "·",
-               "Crop traits", "1 family = 0, 2 = 15, 3 = 25, ≥ 4 = 30 points."),
-        Factor("Winter soil cover", f"{winter} of {n} years with a winter crop", "+" if winter else "−",
-               "Crop traits", "Up to 20 points; covered soil over winter limits erosion and nitrate leaching."),
-        Factor("Rotation intervals", "; ".join(violations) or "all crops respect their return interval",
-               "−" if violations else "+", "Crop traits (AGRO)", "20 points, −10 per violation (disease build-up)."),
+        Factor(I.t("f_legume_label"), I.t("f_of", a=legumes, b=n), "+" if legumes else "−", I.t("f_legume_source"),
+               I.t("f_legume_assume")),
+        Factor(I.t("f_families_label"), f"{len(families)}: {', '.join(I.family(f) for f in sorted(families))}", "+" if len(families) >= 3 else "·",
+               I.t("f_traits"), I.t("f_families_assume")),
+        Factor(I.t("f_winter_label"), I.t("f_winter_value", a=winter, b=n), "+" if winter else "−",
+               I.t("f_traits"), I.t("f_winter_assume")),
+        Factor(I.t("f_interval_label"), "; ".join(violations) or I.t("f_interval_ok"),
+               "−" if violations else "+", I.t("f_interval_source"), I.t("f_interval_assume")),
     ]
     if ctx.soil and ctx.soil.get("soc"):
         factors["soil"].append(Factor(
-            "Soil organic carbon here (context)", f"{ctx.soil['soc']['median']} g/kg (0–30 cm, {ctx.soil.get('texture', '')})",
-            "·", "ISRIC SoilGrids 2.0", "Shown for context; not part of the score."))
+            I.t("f_soc_label"), I.t("f_soc_value", v=_r(ctx.soil["soc"]["median"], 1), tex=I.texture(ctx.soil.get("texture", "")) or ""),
+            "·", "ISRIC SoilGrids 2.0", I.t("f_context_only")))
     if ctx.terrain and ctx.terrain.get("cropland_slope_pct") is not None:
         bare = [c for c in dict.fromkeys(crops) if not tr[c]["winter_cover"]]
         factors["soil"].append(Factor(
-            "Cropland slope here (context)",
-            f"mean {ctx.terrain['cropland_slope_pct']} %; {ctx.terrain['cropland_steep_share_pct']} % of cropland ≥ 10 % slope",
-            "·", "NASA SRTM GL1 (30 m) + ESA WorldCover 2021 cropland",
-            "Shown for context; not part of the score. On slopes ≥ ~10 % bare soil erodes quickly, so the years without "
-            f"winter cover ({', '.join(bare) or 'none'}) matter most there."))
+            I.t("f_slope_label"),
+            I.t("f_slope_value", m=_r(ctx.terrain["cropland_slope_pct"], 1), s=_r(ctx.terrain["cropland_steep_share_pct"], 1)),
+            "·", I.t("f_slope_source"),
+            I.t("f_slope_assume", bare=I.crops(bare) or I.t("f_none"))))
 
     sub = {
         "yield": sum(y_scores) / n,
@@ -241,12 +242,12 @@ def score_rotation(ctx: Context, crops: list[str], priorities: dict[str, float],
     total = sum(sub[k] * w[k] for k in SUB) / wsum
 
     conf = "medium" if ctx.unit["kind"] == "county" else "low"
-    conf_notes = ["Crop yields are county statistics (INS); climate comes from ~25–50 km grids."]
+    conf_notes = [I.t("rot_conf_base")]
     if ctx.unit["kind"] == "commune":
-        conf_notes.append("For a commune, these are the county's yields and the surrounding region's climate.")
+        conf_notes.append(I.t("rot_conf_commune"))
     if "chickpea" in crops or "flax" in crops:
         conf = "low"
-        conf_notes.append("Chickpea / flax have sparse or proxy statistics.")
+        conf_notes.append(I.t("rot_conf_sparse"))
 
     return {
         "crops": crops,

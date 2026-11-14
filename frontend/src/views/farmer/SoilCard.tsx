@@ -53,15 +53,16 @@ export default function SoilCard({ soil, terrain, kind, selected, onSelect }: {
 
 /** SRTM slope / elevation + WorldCover land cover (only where the downloaded tiles cover the unit). */
 function TerrainTiles({ tr, kind }: { tr: Terrain; kind: 'county' | 'commune' }) {
+  const { t } = useI18n()
   const v = tr.values
   const lc = v.landcover_pct ?? {}
   const cells: [string, number | undefined, string, number][] = [
-    ['Mean elevation', v.elevation_m, 'm', 0],
-    ['Cropland slope (mean)', v.cropland_slope_pct, '%', 1],
-    [`Cropland ≥ ${tr.steep_threshold_pct} % slope`, v.cropland_steep_share_pct, '%', 1],
-    ['Cropland share', lc['40'], '%', 1],
-    ['Grassland share', lc['30'], '%', 1],
-    ['Tree cover share', lc['10'], '%', 1],
+    [t('terrElev'), v.elevation_m, 'm', 0],
+    [t('terrSlope'), v.cropland_slope_pct, '%', 1],
+    [t('terrSteep').replace('{p}', String(tr.steep_threshold_pct)), v.cropland_steep_share_pct, '%', 1],
+    [t('terrCrop'), lc['40'], '%', 1],
+    [t('terrGrass'), lc['30'], '%', 1],
+    [t('terrTree'), lc['10'], '%', 1],
   ]
   const shown = cells.filter((c) => c[1] !== undefined)
   if (!shown.length) return null
@@ -72,7 +73,7 @@ function TerrainTiles({ tr, kind }: { tr: Terrain; kind: 'county' | 'commune' })
       </div>
       <SourceNote
         source={`${tr.sources.terrain}; ${tr.sources.landcover}`}
-        period="SRTM 2000 · WorldCover 2021"
+        period={t('terrPeriod')}
         resolution={`${tr.resolution.terrain} / ${tr.resolution.landcover}`}
         confidence={tr.confidence[kind]}
         note={tr.confidence.note}

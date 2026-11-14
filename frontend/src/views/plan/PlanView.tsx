@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { getPlannerField, listFields, makePlan } from '../../api/client'
 import type { PlanAnswers, PlanCrop, PlannerField, PlanResponse, SavedField } from '../../api/types'
 import { fmt } from '../../components/format'
@@ -131,6 +131,15 @@ export default function PlanView({ active, goDraw }: { active: boolean; goDraw: 
       setBusy(false)
     }
   }
+
+  // Language switched: the plan's explanations come from the backend, so fetch the same plan again.
+  const planLang = useRef(lang)
+  useEffect(() => {
+    if (planLang.current === lang) return
+    planLang.current = lang
+    if (result && fieldId) makePlan(fieldId, a).then(setResult).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang])
 
   const hasRow = a.consider.some((c) => ROW.includes(c) && !a.avoid.includes(c))
   const steps = useMemo(() => {

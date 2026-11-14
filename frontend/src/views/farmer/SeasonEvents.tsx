@@ -70,13 +70,13 @@ export default function SeasonEvents({ agro, kind, selected, onSelect }: {
       </div>
       <p className="hint">{t('hintRow')}</p>
       <SourceNote
-        source="NASA POWER daily (MERRA-2) · NASA GLDAS Noah 2.1 monthly"
+        source={t('srcSeasonEvents')}
         period={`${agro.years[0]}–${agro.years[agro.years.length - 1]}`}
         confidence={agro.confidence[kind]}
         note={agro.confidence.note}
         assumptions={[
           ...rows.map((k) => `${agro.indicators[k].label}: ${agro.hazards[k]?.text ?? ''}`),
-          'Heat thresholds are physiological; rain, wet-day and dry-spell thresholds sit near the regional 75th percentile of 2015–2025 (an unusually wet / dry year for the region).',
+          t('thresholdNote'),
         ]}
       />
     </div>

@@ -29,6 +29,7 @@ from typing import Any
 import numpy as np
 
 from .hazards import crop_hazard_keys
+from .. import i18n as I
 
 LAMBDA = 2.0  # ridge penalty on standardised predictors
 MIN_SKILL = 0.1  # weather signal "strong": cuts the benchmark's mean error by ≥ 10 %
@@ -123,8 +124,8 @@ def evaluate(keys: list[str], data: dict) -> dict[str, Any] | None:
 
 def _label(k: str, meta: dict) -> tuple[str, str]:
     if k == TREND:
-        return "Long-term trend", "year"
-    return meta[k]["label"], meta[k]["unit"]
+        return I.t("fc_trend"), I.t("fc_year")
+    return I.L(meta[k]["label"]), I.L(meta[k]["unit"])
 
 
 def forecast(crop: str, counties: dict[str, str], ins: dict, inputs: dict, traits: dict) -> dict[str, Any]:
@@ -242,27 +243,9 @@ def forecast(crop: str, counties: dict[str, str], ins: dict, inputs: dict, trait
         "model": model_info(all_keys, full) if full else None,
         "coverage_80_pct": round(100 * inside / len(held)) if held else None,
         "counties": out, "region": region,
-        "method": [
-            "Yield anomaly (yield ÷ county median − 1) = ridge regression on the crop's sensitive-window weather indicators "
-            f"plus a year trend, pooled over the 8 counties, 2000–2025 (penalty λ = {LAMBDA} on standardised predictors).",
-            "Tested leave-one-year-out: each year is predicted by a model that never saw it. Errors and intervals come from these tests.",
-            f"Benchmark: a normal year = the long-term trend alone. Weather signal: strong if adding the weather cuts the benchmark error by ≥ {MIN_SKILL:.0%}, "
-            f"weak at {WEAK_SKILL:.0%}–{MIN_SKILL:.0%}, none below (then the range is just the usual swing around the trend).",
-            "More indicators were tested (summer Tmax, Apr–Sep rain, GDD, early soil wetness): they made held-out errors worse, so each crop keeps only its own sensitive-window indicators.",
-            "Normal for the forecast season = the trend level with average weather; the verdict and drivers show the weather effect only.",
-            "Intervals = percentiles of the held-out errors: the 80 % interval held 8 in 10 past years, the 50 % interval 1 in 2.",
-            "Supply = latest INS area × yield; assumes the area planted does not change. Normal = same area × normal (trend) yield.",
-        ],
-        "limits": [
-            "County level: INS publishes yields per county only; a field can differ a lot.",
-            "26 seasons: extremes worse than anything since 2000 are not learned; intervals assume the future errs like the past.",
-            "Weather and a straight-line trend only: prices, fertiliser, pests and area changes are not in the model; a county whose yields stopped rising (e.g. Alba maize since 2018) may get a normal that is too high.",
-            "Weather is NASA POWER at ~50 km; associations, not proof of cause.",
-            "The latest season can still change: POWER's last weeks are provisional and late crops may not be harvested yet.",
-        ],
-        "sources": [
-            "INS TEMPO AGR110A (county yield 2000–2025), AGR108A / AGR109A (area, production)",
-            "NASA POWER daily, 2000–2026 (derived/forecast_inputs.json)",
-            "Crop sensitive windows: crop_traits.json",
-        ],
+        "method": [I.t("fc_m1", lam=LAMBDA), I.t("fc_m2"),
+                   I.t("fc_m3", strong=I.pct(MIN_SKILL), weak=I.pct(WEAK_SKILL)),
+                   I.t("fc_m4"), I.t("fc_m5"), I.t("fc_m6"), I.t("fc_m7")],
+        "limits": [I.t(f"fc_l{i}") for i in range(1, 6)],
+        "sources": [I.t(f"fc_s{i}") for i in range(1, 4)],
     }

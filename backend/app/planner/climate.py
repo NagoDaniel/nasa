@@ -15,6 +15,7 @@ import numpy as np
 
 from ..scoring.hazards import HAZARDS, crop_hazard_keys, is_hazard
 from ..scoring.forecast import RENAME
+from .. import i18n as I
 
 # the planner reads soil wetness from NASA POWER (2000–2026), not GLDAS, so the text differs
 SOIL_Z_TEXT = "summer root-zone soil wetness ≥ 1 std below the 2000–2025 mean (NASA POWER)"
@@ -32,7 +33,7 @@ def doy_str(doy: float | None) -> str | None:
     if doy is None:
         return None
     d = date(2025, 1, 1) + timedelta(days=int(round(doy)) - 1)
-    return f"{d.day} {d.strftime('%b')}"
+    return I.months(f"{d.day} {d.strftime('%b')}")
 
 
 def _pct(vals: list[float], q: float) -> float | None:
@@ -44,7 +45,7 @@ def sowing(crop: str, trait: dict, clim: dict, years: list[int]) -> dict[str, An
     """Sowing window: warm enough (7-day mean ≥ sow_temp_c) and, for frost-sensitive crops, after the last frost."""
     pl = trait["planner"]
     if pl["sow"] == "winter":
-        return {"kind": "winter", "window": pl["sow_window"], "text": f"Sow in autumn, {pl['sow_window']} (the year before harvest)."}
+        return {"kind": "winter", "window": I.months(pl["sow_window"]), "text": I.t("pl_sow_winter", w=I.months(pl["sow_window"]))}
     th = pl["sow_temp_c"]
     key = "warm10_doy" if th >= 10 else "warm8_doy" if th >= 8 else "warm5_doy"
     per_year = []
@@ -62,8 +63,8 @@ def sowing(crop: str, trait: dict, clim: dict, years: list[int]) -> dict[str, An
     return {
         "kind": "spring", "per_year": per_year, "start_doy": start, "safe_doy": safe, "n_years": len(ok),
         "start": doy_str(start), "safe": doy_str(safe), "frost_after_safe": late_frost,
-        "text": (f"Soil warm enough (7-day mean ≥ {th} °C){' and past the last frost' if pl['frost_sensitive'] else ''} "
-                 f"by {doy_str(start)} in a typical year; by {doy_str(safe)} in 8 of 10 years."),
+        "text": I.t("pl_sow_spring", th=th, frost=I.t("pl_sow_frost") if pl["frost_sensitive"] else "",
+                     start=doy_str(start), safe=doy_str(safe)),
     }
 
 
@@ -160,7 +161,7 @@ def water_odds(trait: dict, weather: dict, years: list[int], upto: int) -> dict[
         "typical_cover_pct": round(100 * med / mid) if med else None,
         "covers_low_share": sum(1 for r in rain if r >= lo) / len(rain) if rain else None,
         "covers_mid_share": sum(1 for r in rain if r >= mid) / len(rain) if rain else None,
-        "note": "Growing-season rain only (Apr–Sep). The FAO water need is the crop's total use; the rest comes from water stored in the soil over winter (deep-rooted and winter crops use it most) or irrigation.",
+        "note": I.L("Growing-season rain only (Apr–Sep). The FAO water need is the crop's total use; the rest comes from water stored in the soil over winter (deep-rooted and winter crops use it most) or irrigation."),
     }
 
 

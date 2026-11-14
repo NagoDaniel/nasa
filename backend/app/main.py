@@ -4,10 +4,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import ORJSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .assistant import router as assistant
 from .config import settings
 from .db import init_db
+from .i18n import L, reset_lang, set_lang
 from .routers import area, crops, fields, geo, health, nasa, planner
 
 
@@ -48,3 +50,19 @@ async def body_limit(request: Request, call_next):
                 if cl is None or not cl.isdigit() or int(cl) > limit:
                     return ORJSONResponse({"detail": "Request too large"}, status_code=413)
     return await call_next(request)
+
+
+@app.middleware("http")
+async def language(request: Request, call_next):
+    """?lang=ro on any request: texts in the response are Romanian (default English)."""
+    token = set_lang(request.query_params.get("lang"))
+    try:
+        return await call_next(request)
+    finally:
+        reset_lang(token)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, exc: StarletteHTTPException):
+    detail = L(exc.detail) if isinstance(exc.detail, str) else exc.detail
+    return ORJSONResponse({"detail": detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))

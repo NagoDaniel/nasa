@@ -14,6 +14,7 @@ from shapely.geometry import Polygon, mapping, shape
 from shapely.strtree import STRtree
 
 from ..json_store import store
+from ..i18n import num, t
 
 GEOD = Geod(ellps="WGS84")
 MIN_HA = 0.5  # below this even 10 m imagery has < 50 pixels; the UI warns under 1 ha
@@ -29,24 +30,24 @@ def bad(msg: str) -> HTTPException:
 def parse(geometry: dict[str, Any]) -> Polygon:
     """GeoJSON Polygon (lon/lat, one ring) -> valid shapely polygon, or 422."""
     if not isinstance(geometry, dict) or geometry.get("type") != "Polygon":
-        raise bad("Field must be a GeoJSON Polygon")
+        raise bad(t("fd_not_polygon"))
     rings = geometry.get("coordinates")
     if not isinstance(rings, list) or len(rings) != 1 or not isinstance(rings[0], list):
-        raise bad("Field must have exactly one outer ring and no holes")
+        raise bad(t("fd_one_ring"))
     ring = rings[0]
     if not 4 <= len(ring) <= MAX_VERTICES + 1:
-        raise bad(f"Field needs 3–{MAX_VERTICES} corners")
+        raise bad(t("fd_corners", n=MAX_VERTICES))
     pts = []
     for p in ring:
         if not (isinstance(p, list) and len(p) >= 2 and all(isinstance(c, (int, float)) and math.isfinite(c) for c in p[:2])):
-            raise bad("Invalid coordinate")
+            raise bad(t("fd_bad_coord"))
         lon, lat = float(p[0]), float(p[1])
         if not (RO_BBOX[0] <= lon <= RO_BBOX[2] and RO_BBOX[1] <= lat <= RO_BBOX[3]):
-            raise bad("Field must be in Romania")
+            raise bad(t("fd_romania"))
         pts.append((round(lon, 7), round(lat, 7)))
     poly = Polygon(pts)
     if not poly.is_valid:
-        raise bad("Field outline crosses itself; move the corners so the edges do not cross")
+        raise bad(t("fd_crosses"))
     return poly
 
 
@@ -62,9 +63,9 @@ def perimeter_m(poly: Polygon) -> float:
 def check_size(poly: Polygon) -> float:
     ha = area_ha(poly)
     if ha < MIN_HA:
-        raise bad(f"Field is {ha:.2f} ha; the minimum is {MIN_HA} ha")
+        raise bad(t("fd_min", ha=num(ha, 2), min=num(MIN_HA, 1)))
     if ha > MAX_HA:
-        raise bad(f"Selection is {ha:,.0f} ha; the maximum is {MAX_HA:,.0f} ha")
+        raise bad(t("fd_max", ha=num(ha), max=num(MAX_HA)))
     return ha
 
 

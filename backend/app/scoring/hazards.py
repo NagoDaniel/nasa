@@ -17,7 +17,14 @@ class Hazard:
     key: str
     op: str  # ">=" or "<="
     threshold: float
-    text: str
+    en: str
+
+    @property
+    def text(self) -> str:
+        """Threshold sentence in the request's language (Romanian template in app/i18n.py)."""
+        from ..i18n import ro, t
+
+        return t(f"hz_{self.key}") if ro() else self.en
 
 
 HAZARDS: dict[str, Hazard] = {

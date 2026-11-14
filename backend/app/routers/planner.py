@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlmodel import Session, select
 
 from .. import datasets as ds
+from ..i18n import localize
 from ..assistant.guard import RateLimiter, client_key
 from ..db import get_session
 from ..models import FieldPlan, Field_, HarvestReport
@@ -134,8 +135,8 @@ def get_field(fid: int, s: Session = Depends(get_session)) -> dict[str, Any]:
     _, info = _field(s, fid)
     fp = _answers(s, fid)
     reps = [r for r in _all_reports(s) if r["field_id"] == fid]
-    return {"field": info, "answers": json.loads(fp.answers_json) if fp else None, "reports": reps,
-            "learning": _learning(s, fid), "start_year": _start_year()}
+    return localize({"field": info, "answers": json.loads(fp.answers_json) if fp else None, "reports": reps,
+            "learning": _learning(s, fid), "start_year": _start_year()})
 
 
 def _save_answers(s: Session, fid: int, a: Answers) -> None:
@@ -192,14 +193,14 @@ def make_plan(fid: int, a: Answers, request: Request, s: Session = Depends(get_s
                                                     "signal": cf["model"]["signal"]},
             "quality": C.season_check(grown.crop, d["traits"]["crops"][grown.crop], inputs["counties"][info["county"]], inputs["years"], last),
         }
-    return {"field": info, "plan": plan, "learning": learn, "season": season,
+    return localize({"field": info, "plan": plan, "learning": learn, "season": season,
             "method": [
                 "Sowing, maturity and harvest timing: NASA POWER daily weather 2000–2026 for the county (frost dates, 7-day mean temperature, heat sums above 10 °C).",
                 "Yield: county trend from INS yields 2000–2025 (ranges = how far real years fell from the trend), × your field's own level learned from your reports, × previous-crop effect.",
                 "Rotation choice: the dashboard's rotation score (yield, water, soil, risk) with your weights; every allowed sequence is checked.",
                 "Rotation effects (after legume, repeated crop) start from literature values and move toward what farmers report as reports accumulate.",
                 "Seed rates, maturity heat sums and sowing temperatures are approximate agronomy values; confirm with your seed supplier.",
-            ]}
+            ]})
 
 
 @router.post("/fields/{fid}/reports")

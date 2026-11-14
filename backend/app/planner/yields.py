@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from ..scoring import forecast as F
+from .. import i18n as I
 
 _cache: dict[tuple, Any] = {}
 
@@ -56,7 +57,7 @@ def planning_yield(crop: str, county: str, inputs: dict, ins: dict, year: int) -
         normal = med * (1 + anom)
         q = ev["q"]
         return {"normal_kg_ha": normal, "range_kg_ha": {str(lv): [normal + med * q[lv][0], normal + med * q[lv][1]] for lv in (50, 80)},
-                "basis": f"county trend {inputs['years'][0]}–{last}, ranges from held-out years", "confidence": "medium", "proxy": proxy if proxy != crop else None}
+                "basis": I.t("pl_basis_trend", a=inputs["years"][0], b=last), "confidence": "medium", "proxy": proxy if proxy != crop else None}
     # fallback: INS 2015–2025 (chickpea -> grain legumes, flax)
     key = crop if crop in (ins["counties"].get(county) or {}) and crop != "chickpea" else "grain_legumes"
     s = [v for v in ((ins["counties"].get(county, {}).get(key) or {}).get("yield_kg_ha") or []) if v]
@@ -65,7 +66,7 @@ def planning_yield(crop: str, county: str, inputs: dict, ins: dict, year: int) -
     med = float(np.median(s))
     return {"normal_kg_ha": med, "range_kg_ha": {"50": [float(np.percentile(s, 25)), float(np.percentile(s, 75))],
                                                   "80": [float(np.percentile(s, 10)), float(np.percentile(s, 90))]},
-            "basis": f"INS county yields 2015–2025 ({'grain legumes as proxy' if key != crop else 'no long series'})",
+            "basis": I.t("pl_basis_ins", why=I.t("pl_proxy") if key != crop else I.t("pl_no_series")),
             "confidence": "low", "proxy": key if key != crop else None}
 
 

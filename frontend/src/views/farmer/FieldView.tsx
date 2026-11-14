@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FeatureCollection } from 'geojson'
 import {
   createField, deleteField, fieldContext, getVegetationJob, listFields, measureField, startVegetation, updateField,
@@ -62,6 +62,21 @@ export default function FieldView({ active }: { active: boolean }) {
       c.abort()
     }
   }, [fl.ring])
+
+  // Language switched: fetch the same results again with texts in the new language (no reset).
+  const firstLang = useRef(true)
+  useEffect(() => {
+    if (firstLang.current) {
+      firstLang.current = false
+      return
+    }
+    if (!fl.ring) return
+    const g = toPolygon(fl.ring)
+    measureField(g).then(setMeasure).catch(() => {})
+    fieldContext(g).then(setCtx).catch(() => {})
+    if (job?.status === 'done') getVegetationJob(job.job_id).then(setJob).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang])
 
   // Poll the imagery job.
   useEffect(() => {
@@ -268,7 +283,7 @@ function Vegetation({ F, job, jobErr, onLoad, shown, setShown }: {
   const running = job && (job.status === 'queued' || job.status === 'running')
   return (
     <Collapsible id="field-veg" title={F.measuredTitle} summary={vegSummary(F, job)}
-      info={<>{F.measuredSub} NDVI = (NIR − Red) / (NIR + Red): bare soil ≈ 0.1–0.2, dense green crops ≈ 0.7–0.9.</>}>
+      info={<>{F.measuredSub} {F.ndviInfo}</>}>
       <p className="muted small"><span className="badge kind-measured">{F.measured}</span> {F.measuredSub}</p>
       {!job && (
         <div className="stack">
@@ -282,7 +297,7 @@ function Vegetation({ F, job, jobErr, onLoad, shown, setShown }: {
       )}
       {running && (
         <div className="field-progress">
-          <div className="small">{job.stage === 'reading pixels' ? F.reading : job.stage} · {job.progress.done}/{job.progress.total || '…'}</div>
+          <div className="small">{job.stage === 'reading pixels' ? F.reading : job.stage === 'searching catalogues' ? F.searching : job.stage === 'queued' ? F.queued : job.stage} · {job.progress.done}/{job.progress.total || '…'}</div>
           <div className="bar"><i style={{ width: `${job.progress.total ? (100 * job.progress.done) / job.progress.total : 5}%` }} /></div>
         </div>
       )}
@@ -433,10 +448,10 @@ function latestYear(c: { yearly?: Record<string, number> }): [string, number] | 
 }
 const unitFor = (d: CellDataset) => (d.aggregation === 'sum' ? `${d.unit}/yr` : d.unit)
 
-function cellSummary(d: CellDataset): string {
+function cellSummary(F: FieldText, d: CellDataset): string {
   const ok = d.cells.filter((c) => c.status === 'ok')
   if (!ok.length) return '–'
-  if (d.cells.length > 1) return `${d.cells.length} cells`
+  if (d.cells.length > 1) return `${d.cells.length} ${F.cellsN}`
   const ly = latestYear(ok[0])
   return ly ? `${fmt(ly[1], 1)} ${unitFor(d)} (${ly[0]})` : '–'
 }
@@ -464,7 +479,7 @@ function Coarse({ F, ctx, shown, setShown, onFit, fieldBbox }: {
       <Collapsible id="field-coarse" title={F.coarseTitle} info={F.coarseSub} summary={F.datasetsN.replace('{n}', String(ctx.cells.length))}>
         <p className="note small field-estimate-note"><span className="badge kind-estimate">{F.estimate}</span> {F.coarseSub}</p>
         {ctx.cells.map((d) => (
-          <Collapsible key={d.dataset} id={`field-cell-${d.dataset}`} title={d.label} summary={cellSummary(d)}>
+          <Collapsible key={d.dataset} id={`field-cell-${d.dataset}`} title={d.label} summary={cellSummary(F, d)}>
             <p className="muted tiny">{d.resolution}. {d.about} {F.source}: {d.source}. {F.period}: {d.period.start} – {d.period.end}.</p>
             {d.cells.length > 1 && <p className="small">{F.spansCells.replace('{n}', String(d.cells.length))}</p>}
             {d.cells.map((c) => {
@@ -481,7 +496,7 @@ function Coarse({ F, ctx, shown, setShown, onFit, fieldBbox }: {
                     )}
                     <div className="muted tiny">
                       {F.cellOf} ≈ {fmt(c.cell_area_km2, 0)} km² · {F.fieldIsOfCell.replace('{p}', c.field_share_of_cell_pct !== null ? fmt(c.field_share_of_cell_pct, c.field_share_of_cell_pct < 0.01 ? 4 : 2) : '–')}
-                      {d.cells.length > 1 && ` · ${fmt(c.share_of_field_pct, 0)}% of field`}
+                      {d.cells.length > 1 && ` · ${F.ofField.replace('{p}', fmt(c.share_of_field_pct, 0))}`}
                       {!!c.missing_months && ` · ${c.missing_months} ${F.missing}`}
                     </div>
                   </div>

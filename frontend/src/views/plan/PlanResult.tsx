@@ -240,11 +240,11 @@ export default function PlanResult({ r, answers, onEdit, onRefresh }: { r: PlanR
       <LearningCard l={learning} fieldId={r.field.id} start={r.plan.start_year} onSaved={(l) => { setLearning(l); onRefresh() }} />
 
       <SourceNote
-        source="NASA POWER 2000–2026; INS TEMPO yields (AGR110A) and farm-gate prices (PPA102C); crop traits (FAO, IPCC, agronomy); your answers and reports"
+        source={T.planSource}
         period={`${r.plan.start_year}–${end}`}
-        resolution="county weather & statistics × your field"
+        resolution={T.planRes}
         confidence="low"
-        note={`Planning aid, not a guarantee. ${answers.irrigation === 'yes' ? 'Irrigated: water weight set to 0. ' : ''}Ranges come from how far past years fell from the county trend; the field's own level is learned from your reports.`}
+        note={T.planNote.replace('{irr}', answers.irrigation === 'yes' ? T.planIrrigated : '')}
         assumptions={r.method}
       />
     </div>

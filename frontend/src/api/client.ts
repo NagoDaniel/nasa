@@ -3,8 +3,15 @@ import type { AreaBundle, AssistantStatus, FieldContextResp, FieldMeasure, Field
 
 const BASE = '/api'
 
+/** Language of texts the backend writes (labels, notes, explanations); set by the I18nProvider. */
+let apiLang: 'en' | 'ro' = 'en'
+export const setApiLang = (l: 'en' | 'ro') => {
+  apiLang = l
+}
+const withLang = (path: string) => (apiLang === 'en' || path.startsWith('/geo/') ? path : `${path}${path.includes('?') ? '&' : '?'}lang=${apiLang}`)
+
 export async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, init)
+  const res = await fetch(`${BASE}${withLang(path)}`, init)
   if (!res.ok) {
     let detail = res.statusText
     try {
@@ -39,7 +46,7 @@ export const getAssistantStatus = () => getJson<AssistantStatus>('/assistant/sta
 
 /** Chat with the assistant. 429 / 503 still carry a normal reply (with retryAfter in seconds). */
 export async function postChat(message: string, history: ChatTurn[], context: ChatContext, signal?: AbortSignal): Promise<ChatResponse & { retryAfter?: number }> {
-  const res = await fetch(`${BASE}/assistant/chat`, {
+  const res = await fetch(`${BASE}${withLang('/assistant/chat')}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, history, context }),

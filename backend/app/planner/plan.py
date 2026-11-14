@@ -22,6 +22,7 @@ from typing import Any
 from ..scoring.rotation import Context, score_rotation
 from . import climate as C
 from .yields import planning_yield
+from .. import i18n as I
 
 CROPS = ["maize", "wheat", "barley", "oats", "pea", "chickpea", "sunflower", "soy", "flax"]
 ROW_CROPS = {"maize", "sunflower", "soy"}
@@ -36,18 +37,18 @@ def allowed_crops(a: dict, traits: dict) -> tuple[list[str], list[str]]:
     if a.get("planter") is False:
         drop = [c for c in out if c in ROW_CROPS]
         if drop:
-            why.append(f"No row-crop planter: {', '.join(drop)} left out.")
+            why.append(I.t("pl_no_planter", list=I.crops(drop)))
         out = [c for c in out if c not in ROW_CROPS]
     lim = a.get("n_limit")
     if lim is not None:
         drop = [c for c in out if sum(traits["crops"][c]["n_fert_kg_ha"]) / 2 > lim]
         if drop:
-            why.append(f"Nitrogen limit {lim} kg/ha: {', '.join(drop)} need more and were left out.")
+            why.append(I.t("pl_n_limit", lim=lim, list=I.crops(drop)))
         out = [c for c in out if c not in drop]
     must = a.get("must_grow")
     if must and must not in out and must in traits["crops"]:
         out.append(must)
-        why.append(f"{must} kept because you must grow it.")
+        why.append(I.t("pl_must", crop=I.crop(must)))
     return out, why
 
 
@@ -106,14 +107,14 @@ def search(ctx: Context, a: dict, crops: list[str], history: dict[int, str], sta
 def _price(crop: str, county: str, a: dict, prices: dict) -> dict | None:
     own = (a.get("prices") or {}).get(crop)
     if own:
-        return {"lei_t": float(own), "source": "your price"}
+        return {"lei_t": float(own), "source": I.t("pl_price_own")}
     reg = prices["county_region"].get(county)
     s = ((prices["crops"].get(crop) or {}).get(reg) or (prices["crops"].get(crop) or {}).get("RO") or [])
     recent = [v for v in s[-3:] if v]
     if not recent:
         return None
     recent.sort()
-    return {"lei_t": recent[len(recent) // 2], "source": f"INS farm-gate price, {reg or 'Romania'}, median {prices['years'][-3]}–{prices['years'][-1]}"}
+    return {"lei_t": recent[len(recent) // 2], "source": I.t("pl_price_ins", reg=reg or I.t("pl_romania"), a=prices["years"][-3], b=prices["years"][-1])}
 
 
 def year_detail(crop: str, year: int, prev: str | None, county: str, area: float, a: dict, d: dict, level: dict,
@@ -132,17 +133,17 @@ def year_detail(crop: str, year: int, prev: str | None, county: str, area: float
 
     mult, why = level["factor"], []
     if level["n"]:
-        why.append(f"your field {level['pct']:+.0f} % vs county ({level['n']} season{'s' if level['n'] != 1 else ''})")
+        why.append(I.t("pl_level", p=f"{level['pct']:+.0f}", n=level["n"], seasons=I.t("pl_seasons" if level["n"] != 1 else "pl_season")))
     if prev and t["family"] == "cereal" and traits["crops"][prev]["legume"]:
         mult *= 1 + effects["legume_precrop_yield_bonus"]["used"]
-        why.append(f"+{effects['legume_precrop_yield_bonus']['used']:.0%} after {prev}")
+        why.append(I.t("pl_after", p=I.pct(effects["legume_precrop_yield_bonus"]["used"]), prev=I.crop(prev)))
     if prev == crop:
         mult *= 1 - effects["repeat_penalty"]["used"]
-        why.append(f"−{effects['repeat_penalty']['used']:.0%} same crop as the year before")
+        why.append(I.t("pl_repeat", p=I.pct(effects["repeat_penalty"]["used"])))
     ph = (d.get("soil") or {}).get("ph")
     if ph is not None and not (t["ph_opt"][0] <= ph <= t["ph_opt"][1]):
         mult *= 0.95
-        why.append(f"−5 % soil pH {ph} outside {t['ph_opt'][0]}–{t['ph_opt'][1]}")
+        why.append(I.t("pl_ph", ph=ph, lo=t["ph_opt"][0], hi=t["ph_opt"][1]))
     py = planning_yield(crop, county, inputs, ins, year)
     yld = None
     if py:
@@ -198,13 +199,12 @@ def build_plan(field: dict, a: dict, d: dict, level: dict, effects: dict, start:
     history = {int(h["year"]): h["crop"] for h in (a.get("history") or []) if h.get("crop") in traits["crops"]}
     crops, notes = allowed_crops(a, traits)
     if not crops:
-        return {"error": "No crop is left after your answers (considered / refused / machinery / nitrogen). Allow more crops."}
+        return {"error": I.t("pl_err_no_crop")}
     picks, checked = search(ctx, a, crops, history, start, autumn_open)
     if not autumn_open:
-        notes.append(f"The autumn sowing window for the {start} harvest has passed, so year 1 is a spring crop.")
+        notes.append(I.t("pl_autumn_passed", y=start))
     if not picks:
-        return {"error": "No rotation fits: the return gaps after what grew here and your 'must grow' crop rule out every sequence. "
-                         "Allow more crops or fewer years of the must-grow crop."}
+        return {"error": I.t("pl_err_no_rot")}
     dd = {**d, "traits": traits, "soil": {"ph": soil.get("phh2o", {}).get("median")}}
     plans = []
     for p in picks:

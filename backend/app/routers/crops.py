@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from .. import datasets as ds
+from ..i18n import localize
 from ..scoring.forecast import forecast
 from ..scoring.procurement import procurement
 from ..scoring.rotation import score_rotation
@@ -20,10 +21,10 @@ def traits() -> dict[str, Any]:
 def stats(county: str | None = None) -> dict[str, Any]:
     d = ds.ins()
     if county is None:
-        return d
+        return localize(d)
     if county not in d["counties"]:
         raise HTTPException(404, f"No statistics for '{county}'")
-    return {k: v for k, v in d.items() if k != "counties"} | {"county": county, "values": d["counties"][county]}
+    return localize({k: v for k, v in d.items() if k != "counties"} | {"county": county, "values": d["counties"][county]})
 
 
 class Priorities(BaseModel):
@@ -55,7 +56,7 @@ def score(req: ScoreRequest) -> dict[str, Any]:
         results = [{"name": r.name, **score_rotation(ctx, r.crops, req.priorities.as_dict())} for r in req.rotations]
     except ValueError as e:
         raise HTTPException(422, str(e))
-    return {"unit": unit, "priorities": req.priorities.as_dict(), "results": results}
+    return localize({"unit": unit, "priorities": req.priorities.as_dict(), "results": results})
 
 
 @router.get("/procurement")
@@ -65,7 +66,7 @@ def procurement_view(crop: str) -> dict[str, Any]:
         raise HTTPException(404, f"Unknown crop '{crop}'")
     counties, agro_all, fires, ndvi = ds.procurement_inputs()
     outlook = forecast(crop, counties, ds.ins(), ds.store.get("derived/forecast_inputs.json"), traits)
-    return procurement(crop, counties, ds.ins(), agro_all, traits, fires, ndvi, outlook)
+    return localize(procurement(crop, counties, ds.ins(), agro_all, traits, fires, ndvi, outlook))
 
 
 @router.get("/forecast")
@@ -75,4 +76,4 @@ def forecast_view(crop: str) -> dict[str, Any]:
     if crop not in traits["crops"]:
         raise HTTPException(404, f"Unknown crop '{crop}'")
     counties = {u["id"]: u["name"] for u in ds.units_index().values() if u["kind"] == "county"}
-    return forecast(crop, counties, ds.ins(), ds.store.get("derived/forecast_inputs.json"), traits)
+    return localize(forecast(crop, counties, ds.ins(), ds.store.get("derived/forecast_inputs.json"), traits))

@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import APIRouter
 
 from .. import datasets as ds
+from ..i18n import cropclass, landcover, localize, ro, texture
 from ..maplayers import map_layer
 
 router = APIRouter(tags=["area"])
@@ -21,7 +22,7 @@ def area(uid: str) -> dict[str, Any]:
     county = unit["county"]
     indicators = [x for n in ds.indicator_names() if (x := ds.indicator(n, uid))]
     ins = ds.ins()
-    return {
+    out = {
         "unit": unit,
         "indicators": indicators,
         "agro_yearly": ds.agro(uid),
@@ -33,6 +34,17 @@ def area(uid: str) -> dict[str, Any]:
             "county": county, "values": ins["counties"].get(county, {}),
         },
     }
+    if not ro():
+        return out
+    out = localize(out)
+    soil_v = (out.get("soil") or {}).get("values")
+    if soil_v and soil_v.get("texture"):
+        soil_v["texture"] = texture(soil_v["texture"])
+    if out.get("cropmap"):
+        out["cropmap"]["classes"] = {k: cropclass(v) for k, v in out["cropmap"]["classes"].items()}
+    if out.get("terrain") and out["terrain"].get("classes"):
+        out["terrain"]["classes"] = {k: landcover(v) for k, v in out["terrain"]["classes"].items()}
+    return out
 
 
 @router.get("/map")

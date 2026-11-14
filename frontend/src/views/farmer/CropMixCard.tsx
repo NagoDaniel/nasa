@@ -77,7 +77,7 @@ export default function CropMixCard({ cm, stats, kind, selected, onSelect }: {
         resolution={cm.resolution}
         confidence={cm.confidence[kind]}
         note={cm.confidence.note}
-        extra={kind === 'county' ? 'County totals can differ from INS statistics by 30–50% for some crops; use INS for volumes and the map for the crop mix of communes.' : undefined}
+        extra={kind === 'county' ? t('cropMixCountyNote') : undefined}
       />
     </div>
   )

@@ -11,6 +11,7 @@ from __future__ import annotations
 import statistics
 from typing import Any
 
+from .. import i18n as I
 from .hazards import HAZARDS, clean, crop_hazard_keys, cv, hazard_years, median, percentile
 
 GROUPS = {
@@ -170,20 +171,14 @@ def procurement(crop: str, counties: dict[str, str], ins: dict, agro_all: dict, 
         "recommendations": recs,
         "outlook": outlook,
         "assumptions": [
-            "Availability = 100 × (1 − 0.5 × min(1, yield CV / 40%) − 0.5 × share of hazard years); production volume is shown alongside.",
-            "Quality = 100 × (1 − share of years in which the crop's sensitive window was hit; 2015–2025, plus 2026 where NASA POWER has 2026 data).",
-            "Cropland greenness = Apr–Aug mean MODIS NDVI over cropland pixels, latest season vs the mean of the earlier seasons (2022 onward). All crops together; shown as context, not part of the scores.",
-            "Hazard thresholds: " + "; ".join(HAZARDS[k].text for k in crop_hazard_keys(t)) + ".",
-            "Impact = mean of water score (dry-year Apr–Sep rain ÷ crop water need) and emissions score (100 at 0, 0 at ≥ 400 kg CO2e/t).",
-            f"Emissions are field N2O only: mid-range N fertiliser ({t['n_fert_kg_ha'][0]}–{t['n_fert_kg_ha'][1]} kg N/ha) × IPCC EF1 1% × 44/28 × GWP100 273 ÷ 5-year median yield. Fertiliser manufacture, fuel and transport are not included.",
+            I.t("pr_a_avail"),
+            I.t("pr_a_quality"),
+            I.t("pr_a_ndvi"),
+            I.t("f_thresholds", list="; ".join(HAZARDS[k].text for k in crop_hazard_keys(t))),
+            I.t("pr_a_impact"),
+            I.t("pr_a_emis", lo=t["n_fert_kg_ha"][0], hi=t["n_fert_kg_ha"][1]),
         ],
-        "sources": [
-            "INS TEMPO AGR108A/109A/110A (area, production, yield), county level",
-            "NASA POWER daily and NASA GLDAS Noah monthly (hazard years, rain)",
-            "NASA FIRMS VIIRS (vegetation fires)",
-            "NASA MODIS MOD13A3 NDVI on ESA WorldCover 2021 cropland (season greenness)",
-            "Crop traits: FAO (Brouwer & Heibloem 1986; FAO-56), IPCC 2019, AR6",
-        ],
+        "sources": [I.t(k) for k in ("pr_s_ins", "pr_s_weather", "pr_s_fires", "pr_s_ndvi", "pr_s_traits")],
     }
 
 
@@ -192,8 +187,8 @@ def recommendations(crop: str, data: dict, ins: dict, agro_all: dict, traits: di
     prod = {c: d["availability"]["production_t_median_5y"] or 0 for c, d in data.items()}
     total = sum(prod.values())
     if total <= 0:
-        return [{"type": "data", "title": "Not enough production data",
-                 "text": f"INS reports too little {crop} production in these counties to rank sourcing areas.", "numbers": {}}]
+        return [{"type": "data", "title": I.t("pr_nodata_title"),
+                 "text": I.t("pr_nodata_text", crop=I.crop(crop)), "numbers": {}}]
 
     # 1. Spread purchases across reliable, weakly correlated counties
     cand = [c for c in data if prod[c] / total >= 0.05]
@@ -209,8 +204,8 @@ def recommendations(crop: str, data: dict, ins: dict, agro_all: dict, traits: di
         if best:
             a, b, r = best
             recs.append({
-                "type": "spread", "title": "Split purchases between two reliable counties",
-                "text": f"Source {crop} from {counties[a]} and {counties[b]}: both score well on availability and quality, and their yields moved together only weakly (r = {r:.2f}, 2015–2025), so a bad year in one is less likely to hit the other.",
+                "type": "spread", "title": I.t("pr_spread_title"),
+                "text": I.t("pr_spread_text", crop=I.crop(crop), a=counties[a], b=counties[b], r=I.num(r, 2)),
                 "numbers": {"counties": [a, b], "yield_correlation": round(r, 2),
                             "share_of_region_pct": round(100 * (prod[a] + prod[b]) / total)},
             })
@@ -227,20 +222,20 @@ def recommendations(crop: str, data: dict, ins: dict, agro_all: dict, traits: di
         segs = []
         for yr in sorted(by_year, reverse=True):
             n_yr = sum(1 for d in data.values() if d["quality"]["latest_year"] == yr)
-            parts = [f"{HAZARDS[k].text}: {', '.join(cs) if len(cs) < n_yr else 'all counties with ' + str(yr) + ' data'}"
+            parts = [f"{HAZARDS[k].text}: {', '.join(cs) if len(cs) < n_yr else I.t('pr_q_all', y=yr)}"
                      for k, cs in sorted(by_year[yr].items(), key=lambda x: -len(x[1]))]
-            segs.append(f"In {yr} the {crop} sensitive period was hit — " + "; ".join(parts) + ".")
+            segs.append(I.t("pr_q_seg", y=yr, crop=I.crop(crop), parts="; ".join(parts)))
         latest = {c: d["quality"]["latest_year"] for c, d in data.items() if d["quality"]["latest_year"]}
         note = ""
         if len(set(latest.values())) > 1:
             newest = max(latest.values())
             have = [counties[c] for c, y in latest.items() if y == newest]
-            note = f" {newest} weather data exist only for {', '.join(have)}; the other counties show their latest season ({min(latest.values())})."
+            note = I.t("pr_q_note", y=newest, have=", ".join(have), old=min(latest.values()))
         years_txt = "/".join(str(y) for y in sorted(by_year, reverse=True))
         recs.append({
-            "type": "quality", "title": f"Check {years_txt} lots for weather-related quality problems",
-            "text": " ".join(segs) + " " + traits["crops"][crop]["sensitive"]["quality"]
-                    + " Test incoming lots (e.g. mycotoxins) before blending." + note,
+            "type": "quality", "title": I.t("pr_q_title", years=years_txt),
+            "text": " ".join(segs) + " " + I.L(traits["crops"][crop]["sensitive"]["quality"])
+                    + I.t("pr_q_test") + note,
             "numbers": {"counties": list(hit), "by_year_hazard": {str(y): v for y, v in by_year.items()}},
         })
 
@@ -263,8 +258,8 @@ def recommendations(crop: str, data: dict, ins: dict, agro_all: dict, traits: di
         if alts:
             c, s = max(alts, key=lambda x: x[1])
             recs.append({
-                "type": "alternative", "title": f"Consider {c} as a partial substitute",
-                "text": f"In this region {c} scores {s:.0f} on availability + quality versus {mine:.0f} for {crop} ({group} ingredient group). Test it in recipes as a partial replacement to spread weather risk.",
+                "type": "alternative", "title": I.t("pr_alt_title", alt=I.crop(c)),
+                "text": I.t("pr_alt_text", alt=I.crop(c), s=f"{s:.0f}", m=f"{mine:.0f}", crop=I.crop(crop), group=I.t(f"pr_group_{group}")),
                 "numbers": {"alternative": c, "alt_score": round(s), "crop_score": round(mine)},
             })
 
@@ -281,17 +276,11 @@ def recommendations(crop: str, data: dict, ins: dict, agro_all: dict, traits: di
             co2 = dn * A["n2o_ef1"]["value"] * A["n2o_n_to_n2o"]["value"] * A["n2o_gwp100"]["value"] / 1000
             pea_t = ha * pea_y / 1000
             recs.append({
-                "type": "contract", "title": "Contract farmers who add pea to their rotation",
-                "text": (f"If a quarter of the {crop} area in these counties ({area:,.0f} ha in the latest year) grew pea one year in four, "
-                         f"about {ha:,.0f} ha/yr would be pea: ≈ {pea_t:,.0f} t pea (≈ {pea_t * PEA_PROTEIN[0]:,.0f}–{pea_t * PEA_PROTEIN[1]:,.0f} t protein), "
-                         f"≈ {dn / 1000:,.0f} t less fertiliser N and ≈ {co2:,.0f} t CO2e less field N2O per year, plus a yield bonus for the following cereal. "
-                         "Offer contracts or premiums to these farmers."),
+                "type": "contract", "title": I.t("pr_contract_title"),
+                "text": I.t("pr_contract_text", crop=I.crop(crop), area=I.num(area), ha=I.num(ha), pea_t=I.num(pea_t),
+                            p_lo=I.num(pea_t * PEA_PROTEIN[0]), p_hi=I.num(pea_t * PEA_PROTEIN[1]), n_t=I.num(dn / 1000), co2=I.num(co2)),
                 "numbers": {"area_ha": area, "pea_ha_per_year": round(ha), "pea_t": round(pea_t), "n_saved_t": round(dn / 1000, 1), "co2e_saved_t": round(co2)},
-                "assumptions": [
-                    "25% of the crop's area, pea once in a 4-year rotation (replaces this crop that year).",
-                    "Pea yield = median county pea yield 2015–2025 (INS); protein 21–25% of dry seed.",
-                    "Fertiliser N: mid-range of crop traits; N2O via IPCC EF1 1%, GWP100 273. Estimate only.",
-                ],
+                "assumptions": [I.t("pr_contract_a1"), I.t("pr_contract_a2"), I.t("pr_contract_a3")],
             })
     return recs
 
@@ -304,25 +293,26 @@ def outlook_recs(crop: str, outlook: dict, counties: dict) -> list[dict]:
     fc = {c: outlook["counties"][c]["forecast"] for c in reg["counties"]}
     pct = round(100 * (reg["production_t"] / reg["normal_t"] - 1)) if reg["normal_t"] else None
     low = [counties[c] for c, f in fc.items() if f["supply"]["vs_normal_pct"] <= -10]
-    names = "the 8 study counties" if len(reg["counties"]) == len(counties) else ", ".join(counties[c] for c in reg["counties"])
+    names = I.t("pr_o_names_all") if len(reg["counties"]) == len(counties) else ", ".join(counties[c] for c in reg["counties"])
+    cn = I.crop(crop)
     if pct is not None and pct <= -10:
-        title = f"Expect less {crop} from {names} in {reg['year']}"
-        action = "Secure volume early or shift part of the purchase to other counties / an alternative ingredient."
+        title = I.t("pr_o_low_title", crop=cn, names=names, y=reg["year"])
+        action = I.t("pr_o_low_action")
     elif pct is not None and pct >= 10:
-        title = f"Good {reg['year']} {crop} outlook in {names}"
-        action = "A good moment to contract volume from these counties."
+        title = I.t("pr_o_good_title", crop=cn, names=names, y=reg["year"])
+        action = I.t("pr_o_good_action")
     else:
-        title = f"Normal {reg['year']} {crop} outlook in {names}"
-        action = "No change to the buying plan needed from the weather signal."
+        title = I.t("pr_o_norm_title", crop=cn, names=names, y=reg["year"])
+        action = I.t("pr_o_norm_action")
     drivers = sorted((x for f in fc.values() for x in f["contributions"]), key=lambda x: x["effect_pct"])
     worst = drivers[0] if drivers and drivers[0]["effect_pct"] < -3 else None
-    sig = "" if reg.get("signal") == "strong" else " The weather signal is weak (the model beats a trend-only guess by only 5–10 %), so treat this as a hint."
+    sig = "" if reg.get("signal") == "strong" else I.t("pr_o_weak")
     return [{
         "type": "outlook", "title": title,
-        "text": (f"Weather-based forecast for {names}: about {reg['production_t']:,} t "
-                 f"(likely {reg['low_t']:,}–{reg['high_t']:,} t) vs {reg['normal_t']:,} t in a normal year ({pct:+d} %)."
-                 + (f" Main drag: {worst['label']} ({worst['effect_pct']:+.0f} %)." if worst else "")
-                 + (f" Weakest: {', '.join(low)}." if low and len(low) < len(fc) else "") + " " + action
+        "text": (I.t("pr_o_text", names=names, p=I.num(reg["production_t"]), lo=I.num(reg["low_t"]), hi=I.num(reg["high_t"]),
+                     n=I.num(reg["normal_t"]), pct=f"{pct:+d}")
+                 + (I.t("pr_o_drag", label=I.L(worst["label"]), e=f"{worst['effect_pct']:+.0f}") if worst else "")
+                 + (I.t("pr_o_weakest", list=", ".join(low)) if low and len(low) < len(fc) else "") + " " + action
                  + sig),
         "numbers": {"region": reg},
         "assumptions": outlook["method"][-2:],

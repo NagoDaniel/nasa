@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useI18n } from '../i18n'
 
 export type Async<T> = { data: T | null; error: string | null; loading: boolean }
 
-/** Fetch when `key` changes; ignores stale responses. */
+/** Fetch when `key` or the language changes (the backend writes texts in it); ignores stale responses. */
 export function useAsync<T>(key: string | null, fn: () => Promise<T>): Async<T> {
+  const { lang } = useI18n()
   const [state, setState] = useState<Async<T>>({ data: null, error: null, loading: !!key })
   useEffect(() => {
     if (!key) {
@@ -20,6 +22,6 @@ export function useAsync<T>(key: string | null, fn: () => Promise<T>): Async<T> 
       live = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
+  }, [key, lang])
   return state
 }

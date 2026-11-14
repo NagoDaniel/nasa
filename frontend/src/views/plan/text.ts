@@ -115,6 +115,10 @@ const en = {
   options: 'Maturity options here',
   beforeFrost: 'mature before frost',
   wetHarvest: 'wet harvest',
+  planSource: 'NASA POWER 2000–2026; INS TEMPO yields (AGR110A) and farm-gate prices (PPA102C); crop traits (FAO, IPCC, agronomy); your answers and reports',
+  planRes: 'county weather & statistics × your field',
+  planNote: 'Planning aid, not a guarantee. {irr}Ranges come from how far past years fell from the county trend; the field\'s own level is learned from your reports.',
+  planIrrigated: 'Irrigated: water weight set to 0. ',
 }
 
 type T = typeof en
@@ -164,6 +168,10 @@ const ro: T = {
   literature: 'literatură', measured: 'măsurat', used: 'folosit acum', report: 'Raportați o recoltă', reportBtn: 'Salvează recolta',
   saved: 'Salvat — modelul s-a actualizat.', method: 'Cum se face planul', options: 'Grupele de maturitate aici',
   beforeFrost: 'ajung la maturitate înainte de îngheț', wetHarvest: 'recoltă pe vreme umedă',
+  planSource: 'NASA POWER 2000–2026; randamente INS TEMPO (AGR110A) și prețuri la poarta fermei (PPA102C); caracteristicile culturilor (FAO, IPCC, agronomie); răspunsurile și rapoartele dvs.',
+  planRes: 'vremea și statisticile județului × parcela dvs.',
+  planNote: 'Ajutor de planificare, nu o garanție. {irr}Intervalele vin din cât de departe au căzut anii trecuți față de tendința județului; nivelul propriu al parcelei e învățat din rapoartele dvs.',
+  planIrrigated: 'Irigat: ponderea apei setată la 0. ',
 }
 
 export const PROBLEMS = ['drought', 'hail', 'frost', 'pests', 'disease', 'mycotoxins', 'waterlogging', 'lodging', 'other'] as const

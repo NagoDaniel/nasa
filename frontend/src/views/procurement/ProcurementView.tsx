@@ -18,11 +18,6 @@ export type Metric = 'availability' | 'quality' | 'impact'
 const METRICS: Metric[] = ['availability', 'quality', 'impact']
 const SCORE_SCALE = makeScale([], 'score')
 
-const HAZARD_SHORT: Record<string, string> = {
-  heat35_jul_aug: 'heat ≥35 °C', heat32_jul_aug: 'hot summer', heat30_jun: 'June heat', rootmoist_jja_z: 'dry soil',
-  dry_spell_apr_sep: 'dry spell', rain_flowering_small_grain: 'wet flowering', wet_days_flowering_small_grain: 'wet flowering',
-  late_frost: 'late frost', rain_harvest_small_grain: 'wet harvest', rain_harvest_summer_crops: 'wet harvest',
-}
 
 /** Buyer's view. The crop and score chosen here colour the counties on the map. */
 export default function ProcurementView({ section, selectedCounty, active }: {
@@ -125,7 +120,7 @@ function Sourcing({ d, metric, setMetric, selected }: { d: ProcurementResponse; 
                 </td>
                 <td><Score s={v.availability.score} sub={`${v.availability.hazard_years}/${v.availability.years} bad yrs · CV ${fmt((v.availability.yield_cv ?? 0) * 100)}%`} /></td>
                 <td>
-                  <Score s={v.quality.score} sub={v.quality.latest_hits.length ? [...new Set(v.quality.latest_hits.map((h) => HAZARD_SHORT[h] ?? h))].join(', ') : undefined} />
+                  <Score s={v.quality.score} sub={v.quality.latest_hits.length ? [...new Set(v.quality.latest_hits.map((h) => t(`hzs_${h}` as Parameters<typeof t>[0]) ?? h))].join(', ') : undefined} />
                 </td>
                 <td>
                   <Score s={v.impact.score} />

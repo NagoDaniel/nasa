@@ -19,6 +19,7 @@ from shapely.geometry import Polygon, box, mapping
 
 from ..config import BASE_DIR
 from ..json_store import store
+from ..i18n import L, t
 
 GEOD = Geod(ellps="WGS84")
 
@@ -104,8 +105,7 @@ def cell_context(name: str, field: Polygon) -> dict[str, Any] | None:
         "about": CELL_DATASETS.get(name, ""), "source": d["source"], "resolution": d["resolution"],
         "period": {"start": d["keys"][0], "end": d["keys"][-1]}, "last_day": d.get("last_day"),
         "kind": "surrounding_area_estimate",
-        "note": (f"One value for each {d['resolution']} cell. Your field covers only a tiny part of it, and the value "
-                 "is the same everywhere inside the cell; it does not show differences within a town or between fields."),
+        "note": t("fd_cell_note", res=L(d["resolution"])),
         "cells": cells,
     }
 

@@ -16,6 +16,7 @@ from ..db import get_session
 from ..field import coarse, imagery
 from ..field.geom import check_size, describe, parse
 from ..models import Farm, FieldPlan, Field_, HarvestReport
+from ..i18n import L, localize, num, ro, t
 
 router = APIRouter(prefix="/fields", tags=["fields"])
 jobs_limiter = RateLimiter(settings.rate_field_jobs_per_min, settings.rate_field_jobs_per_day, 0)
@@ -68,11 +69,11 @@ def measure(body: GeomIn) -> dict:
     ha = d["area_ha"]
     d["warnings"] = []
     if ha < 1:
-        d["warnings"].append("Under 1 ha: only a handful of 30 m HLS pixels fall inside; treat field values as rough.")
+        d["warnings"].append(t("fd_under1"))
     if d["commune"] is None:
-        d["warnings"].append("Outside the study area (Alba and neighbours): only imagery is available here.")
+        d["warnings"].append(t("fd_outside"))
     d["limits"] = {"min_ha": 0.5, "max_ha": 5000}
-    return d
+    return localize(d)
 
 
 @router.post("/context")
@@ -81,7 +82,7 @@ def context(body: GeomIn) -> dict:
     poly = parse(body.geometry)
     check_size(poly)
     d = describe(poly)
-    return {"field": d, **coarse.context(poly, (d["commune"] or {}).get("id"))}
+    return localize({"field": d, **coarse.context(poly, (d["commune"] or {}).get("id"))})
 
 
 @router.post("/vegetation")
@@ -90,7 +91,7 @@ def vegetation(body: GeomIn, request: Request) -> dict:
     poly = parse(body.geometry)
     check_size(poly)
     _limit(jobs_limiter, request)
-    return imagery.start(poly).public()
+    return veg_out(imagery.start(poly).public())
 
 
 @router.get("/vegetation/{job_id}")
@@ -100,7 +101,7 @@ def vegetation_job(job_id: str) -> dict:
     j = imagery.get(job_id)
     if j is None:
         raise HTTPException(404, "Unknown or expired job; start it again")
-    return j.public()
+    return veg_out(j.public())
 
 
 @router.get("")
@@ -116,7 +117,7 @@ def create_field(body: FieldIn, request: Request, s: Session = Depends(get_sessi
     if s.exec(select(func.count()).select_from(Field_)).one() >= settings.max_saved_fields:
         raise HTTPException(409, "Too many saved fields; delete some first")
     d = describe(poly)
-    name = sanitize(body.name, 60) or f"Field {ha:.1f} ha"
+    name = sanitize(body.name, 60) or t("fd_default_name", ha=num(ha, 1))
     f = Field_(farm_id=_farm(s).id, name=name, geometry_geojson=json.dumps(d["geometry"]), area_ha=d["area_ha"],
                commune_id=(d["commune"] or {}).get("id"))
     s.add(f)
@@ -157,3 +158,51 @@ def delete_field(fid: int, request: Request, s: Session = Depends(get_session)) 
     s.delete(f)
     s.commit()
     return {"deleted": fid}
+
+
+_SKIP = re.compile(r"^Scene ≥ (\d+)% cloud: pixels not read$")
+_SPIKE = re.compile(r"^NDVI ([-\d.]+) differs by more than ([\d.]+) from the clear images on (\S+) \(([-\d.]+)\) and (\S+) \(([-\d.]+)\): "
+                    r"possible undetected cloud or haze$")
+
+
+def _note(n: str | None) -> str | None:
+    """Imagery notes are stored in English (results are cached); translate when served."""
+    if not n:
+        return n
+    if m := _SKIP.match(n):
+        return t("fd_scene_skip", p=m.group(1))
+    if m := _SPIKE.match(n):
+        return t("fd_spike", v=m.group(1), d=m.group(2), d1=m.group(3), v1=m.group(4), d2=m.group(5), v2=m.group(6))
+    if n == "Could not read this image (Earthdata login?)":
+        return t("fd_read_error_hls")
+    if n == "Could not read this image":
+        return t("fd_read_error")
+    return L(n)
+
+
+def veg_out(job: dict) -> dict:
+    """Imagery job for the client, with texts in the request's language."""
+    if not ro():
+        return job
+    out = {**job, "error": L(job.get("error"))}
+    r = job.get("result")
+    if not r:
+        return out
+    r = localize(r)
+    r["index"] = t("fd_index")
+    r["status_rules"] = {
+        "clear": t("fd_rule_clear", p=f"{imagery.CLEAR_PCT:.0f}"),
+        "partly_cloudy": t("fd_rule_partly", a=f"{imagery.PARTLY_PCT:.0f}", b=f"{imagery.CLEAR_PCT:.0f}"),
+        "cloudy": t("fd_rule_cloudy", a=f"{imagery.PARTLY_PCT:.0f}", s=f"{imagery.SKIP_CLOUD:.0f}"),
+        "no_data": t("fd_rule_nodata"), "error": t("fd_rule_error"),
+        "suspect": t("fd_rule_suspect", d=num(imagery.SPIKE_NDVI, 2), days=imagery.SPIKE_DAYS),
+    }
+    for src in (r.get("sources") or {}).values():
+        obs = list(src.get("observations") or [])
+        obs += [o for p in (src.get("peaks") or []) for o in (p.get("observations") or [])]
+        if src.get("latest_clear"):
+            obs.append(src["latest_clear"])
+        for o in obs:
+            o["note"] = _note(o.get("note"))
+    out["result"] = r
+    return out

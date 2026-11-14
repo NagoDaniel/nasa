@@ -41,7 +41,7 @@ export default function RotationCompare({ unitId, priorities, rots, setRots }: {
         .finally(() => { if (!ctl.signal.aborted) setBusy(false) })
     }, 250)
     return () => { clearTimeout(id); ctl.abort() }
-  }, [unitId, priorities, rots])
+  }, [unitId, priorities, rots, lang])
 
   const update = (i: number, r: Rot) => setRots(rots.map((x, j) => (j === i ? r : x)))
   const label = (r: Rot) => r.crops.map((c) => cropName(c, lang)).join(' – ')
