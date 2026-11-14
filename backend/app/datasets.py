@@ -12,8 +12,9 @@ __all__ = ["store"]
 
 # Indicators shown on the farmer dashboard, in display order.
 INDICATOR_ORDER = [
-    "imerg_precip", "gldas_rootmoist", "power_heat_days", "gldas_et", "power_tmax",
-    "firms_fires", "modis_ndvi", "power_precip", "gldas_soilmoist_0_10", "gldas_pet",
+    "imerg_precip", "modis_ndvi", "smap_soil_moisture", "gldas_rootmoist", "power_heat_days", "modis_et",
+    "modis_lst_day", "grace_tws", "power_tmax", "firms_fires",
+    "gldas_et", "modis_pet", "modis_ndvi_all", "modis_lst_night", "power_precip", "gldas_soilmoist_0_10", "gldas_pet",
     "gldas_rain", "power_tmean", "power_frost_days", "power_gdd10", "power_rh", "power_soil_wetness",
 ]
 
@@ -55,6 +56,18 @@ def agro(uid: str) -> dict[str, Any]:
 def soil(uid: str) -> dict[str, Any]:
     d = store.get("soil/soilgrids.json")
     return {k: v for k, v in d.items() if k != "units"} | {"values": d["units"].get(uid)}
+
+
+def terrain(uid: str) -> dict[str, Any] | None:
+    """SRTM terrain + WorldCover land cover; None when the unit is outside the downloaded tiles."""
+    try:
+        d = store.get("land/terrain.json")
+    except FileNotFoundError:
+        return None
+    vals = d["units"].get(uid)
+    if vals is None:
+        return None
+    return {k: v for k, v in d.items() if k != "units"} | {"values": vals}
 
 
 def ins() -> dict[str, Any]:

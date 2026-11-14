@@ -38,7 +38,16 @@ aligned with `keys` (`null` = no data).
 | `gldas_et`, `gldas_pet`, `gldas_rain` | ET, potential evaporation, rain, mm/month | GLDAS Noah 2.1 |
 | `power_*` | Tmax, Tmean, hot days ≥ 32 °C, frost days, GDD10, precip, RH, soil wetness | NASA POWER daily |
 | `firms_fires` | vegetation-fire detections per month | FIRMS VIIRS S-NPP |
-| `modis_ndvi` | 16-day mean NDVI (sample: Alba 2024) | MODIS MOD13Q1 via AppEEARS |
+| `modis_ndvi`, `modis_ndvi_all` | monthly NDVI on cropland / all land (2021-11 – 2026-10) | MODIS MOD13A3, tile h19v04 |
+| `modis_et`, `modis_pet` | monthly ET / PET on cropland, mm (2021-11 – 2025-12) | MODIS MOD16A2GF |
+| `modis_lst_day`, `modis_lst_night` | monthly land surface temperature on cropland, °C | MODIS MOD11A2 |
+| `smap_soil_moisture` | monthly surface soil moisture, m³/m³ (Alba Iulia box only) | SMAP SPL3SMP_E |
+| `grace_tws` | monthly total water storage anomaly, cm (2002 –) | GRACE / GRACE-FO JPL mascon |
+
+Cropland = ≥ 50 % ESA WorldCover 2021 class 40 inside the MODIS pixel. Raw for these
+lives in `<repo>/data/` (see `dataset_dani.md`). GLDAS runs to 2026-07 (global files) and
+POWER to 2026-10 for the 9 cells around Alba Iulia; `gldas` keeps months whose raw files
+are not on the machine from the previous JSON (`common.merge_existing`).
 
 Known raw-data issue: `GLDAS_NOAH025_M_201501_AOI.nc4` holds IMERG data (bad
 download), so GLDAS 2015-01 is empty (`missing_periods`). The IMERG 2015-01

@@ -26,6 +26,7 @@ def area(uid: str) -> dict[str, Any]:
         "indicators": indicators,
         "agro_yearly": ds.agro(uid),
         "soil": ds.soil(uid),
+        "terrain": ds.terrain(uid),
         "cropmap": ds.cropmap(uid),
         "crop_stats": {
             "source": ins["source"], "years": ins["years"], "confidence": ins["confidence"],

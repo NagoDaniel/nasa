@@ -18,10 +18,10 @@ import RotationCompare, { PRESETS, type Rot } from './RotationCompare'
 import SeasonEvents from './SeasonEvents'
 import SoilCard from './SoilCard'
 
-const MAIN = ['imerg_precip', 'gldas_rootmoist', 'power_heat_days', 'gldas_et', 'power_tmax', 'firms_fires', 'modis_ndvi']
+const MAIN = ['imerg_precip', 'modis_ndvi', 'smap_soil_moisture', 'gldas_rootmoist', 'power_heat_days', 'modis_et', 'grace_tws', 'firms_fires']
 const COLORS: Record<string, string> = {
-  imerg_precip: PALETTE[0], gldas_rootmoist: PALETTE[5], power_heat_days: PALETTE[4], gldas_et: PALETTE[2],
-  firms_fires: PALETTE[1], power_tmax: PALETTE[7], modis_ndvi: PALETTE[6],
+  imerg_precip: PALETTE[0], gldas_rootmoist: PALETTE[5], power_heat_days: PALETTE[4], modis_et: PALETTE[2],
+  firms_fires: PALETTE[1], grace_tws: PALETTE[7], modis_ndvi: PALETTE[6], smap_soil_moisture: PALETTE[3],
 }
 
 /** One section at a time; the choices made in each section are kept while you move around. */
@@ -86,7 +86,7 @@ export default function FarmerView({ unitId, countyName, section, active }: {
 
       {section === 'risks' && <SeasonEvents agro={a.agro_yearly} kind={kind} selected={risk} onSelect={setRisk} />}
 
-      {section === 'soil' && <SoilCard soil={a.soil} kind={kind} selected={soilProp} onSelect={setSoilProp} />}
+      {section === 'soil' && <SoilCard soil={a.soil} terrain={a.terrain} kind={kind} selected={soilProp} onSelect={setSoilProp} />}
 
       {section === 'crops' && (
         <div className="stack">
