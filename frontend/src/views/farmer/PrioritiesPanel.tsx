@@ -1,5 +1,4 @@
 import type { Priorities } from '../../api/types'
-import Card from '../../components/Card'
 import Info from '../../components/Info'
 import { useI18n } from '../../i18n'
 import { useExplain } from '../../i18n/explain'
@@ -11,7 +10,7 @@ export default function PrioritiesPanel({ value, onChange }: { value: Priorities
   const x = useExplain()
   const sum = KEYS.reduce((a, k) => a + value[k], 0) || 1
   return (
-    <Card title={t('priorities')} sub={t('prioritiesSub')} info={x.priorities}>
+    <div className="block">
       <div className="sliders">
         {KEYS.map((k) => (
           <label key={k} className="slider">
@@ -22,6 +21,6 @@ export default function PrioritiesPanel({ value, onChange }: { value: Priorities
           </label>
         ))}
       </div>
-    </Card>
+    </div>
   )
 }

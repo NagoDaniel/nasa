@@ -12,6 +12,7 @@ const en = {
     perYear: 'Each bar is one year. For amounts (rain, days, fires) the months are added up; for states (temperature, soil moisture) they are averaged. A faded bar marked * is an incomplete year. The dashed line is the average of the complete years.',
     byMonth: 'Grey line: the average for each calendar month over all years. Coloured line: the latest year. Where the coloured line is below the grey one, that month was lower than usual.',
     scoreScale: 'Scores run 0–100; higher is always better. Green ≥ 70 good, yellow 50–69 fair, orange 30–49 weak, red < 30 poor.',
+    mapLegend: 'The map is coloured by this value: each commune (or county) gets a colour from the scale below. Colours are comparable between years, so you can step through the years with the slider and watch the pattern change. Hover an area to read its value; click it to select it.',
     eventsTable: 'Each number is that year’s value for the area (e.g. days or mm). Red cells crossed the risk threshold shown in the row. Day counts can have decimals because the area is averaged over several data cells.',
   },
   indicators: {
@@ -105,6 +106,7 @@ const ro: Explain = {
     perYear: 'Fiecare bară este un an. Pentru cantități (ploaie, zile, incendii) lunile se adună; pentru stări (temperatură, umiditatea solului) se face media. O bară estompată marcată cu * este un an incomplet. Linia punctată este media anilor compleți.',
     byMonth: 'Linia gri: media fiecărei luni calendaristice pe toți anii. Linia colorată: ultimul an. Unde linia colorată e sub cea gri, luna a fost mai scăzută decât de obicei.',
     scoreScale: 'Scorurile sunt între 0 și 100; mai mare înseamnă mereu mai bine. Verde ≥ 70 bun, galben 50–69 acceptabil, portocaliu 30–49 slab, roșu < 30 foarte slab.',
+    mapLegend: 'Harta este colorată după această valoare: fiecare comună (sau județ) primește o culoare din scala de mai jos. Culorile sunt comparabile între ani, deci puteți parcurge anii cu cursorul și urmări cum se schimbă tiparul. Treceți peste o zonă ca să-i citiți valoarea; faceți clic pentru a o selecta.',
     eventsTable: 'Fiecare număr este valoarea anului pentru zona aleasă (de ex. zile sau mm). Celulele roșii au depășit pragul de risc arătat în rând. Numărul de zile poate avea zecimale, pentru că zona e o medie a mai multor celule de date.',
   },
   indicators: {

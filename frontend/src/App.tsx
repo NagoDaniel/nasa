@@ -1,76 +1,183 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getMapLayer, getUnits } from './api/client'
+import type { MapLayerData } from './api/types'
+import { useAsync } from './components/useAsync'
 import { I18nProvider, useI18n } from './i18n'
-import { useExplain } from './i18n/explain'
-import RomaniaMap, { type AreaSelection, type Choropleth } from './map/RomaniaMap'
-import { AOI } from './map/style'
+import type { Dict } from './i18n/en'
+import AreaBar from './layout/AreaBar'
+import MapLegend from './layout/MapLegend'
+import Sidebar from './layout/Sidebar'
+import RomaniaMap, { type MapHandle, type MapPick } from './map/RomaniaMap'
+import { makeScale } from './map/scales'
+import { MapLink, sameSpec, type LayerSpec, type MapLinkCtx, type ResolvedLayer } from './state/MapLink'
+import { SECTIONS, type FarmerSection, type ProcurementSection, type Role, type Section } from './state/sections'
 import FarmerView from './views/farmer/FarmerView'
 import ProcurementView from './views/procurement/ProcurementView'
 
 const AOI_BOUNDS: [[number, number], [number, number]] = [[20.6, 44.4], [25.4, 47.7]]
-type Tab = 'farmer' | 'procurement'
 
-const ALBA: AreaSelection = { kind: 'county', code: 'AB', name: 'Alba', region: 'Centru', nuts2: 'RO12' }
+function usePersisted(key: string, initial: boolean): [boolean, (v: boolean) => void] {
+  const [v, setV] = useState(() => {
+    try {
+      const s = localStorage.getItem(key)
+      return s === null ? initial : s === '1'
+    } catch {
+      return initial
+    }
+  })
+  const set = useCallback((n: boolean) => {
+    setV(n)
+    try {
+      localStorage.setItem(key, n ? '1' : '0')
+    } catch {
+      /* storage unavailable */
+    }
+  }, [key])
+  return [v, set]
+}
 
 function Shell() {
-  const { t, lang, setLang } = useI18n()
-  const x = useExplain()
-  const [tab, setTab] = useState<Tab>('farmer')
-  const [sel, setSel] = useState<AreaSelection>(ALBA)
-  const [choropleth, setChoropleth] = useState<Choropleth>(null)
+  const { t } = useI18n()
+  const [role, setRole] = useState<Role>('farmer')
+  const [sections, setSections] = useState<{ farmer: FarmerSection; procurement: ProcurementSection }>({ farmer: 'overview', procurement: 'sourcing' })
+  const section = sections[role]
+  const [navCollapsed, setNavCollapsed] = usePersisted('s2f.nav.collapsed', false)
+  const [panelOpen, setPanelOpen] = usePersisted('s2f.panel.open', true)
 
-  const countyCode = sel.kind === 'county' ? sel.code : sel.county
-  const inAoi = AOI.includes(countyCode)
-  const unitId = sel.kind === 'county' ? sel.code : sel.id
-  const countyName = sel.kind === 'county' ? sel.name : sel.countyName
+  const [selectedId, setSelectedId] = useState('AB')
+  const [notice, setNotice] = useState<string | null>(null)
+  const units = useAsync('units', getUnits)
+  const byId = useMemo(() => new Map((units.data ?? []).map((u) => [u.id, u])), [units.data])
+  const sel = byId.get(selectedId)
+  const countyCode = selectedId.split('-')[0]
+  const countyName = byId.get(countyCode)?.name ?? countyCode
+  const mapRef = useRef<MapHandle>(null)
+
+  // What the map is coloured by.
+  const [spec, setSpecState] = useState<LayerSpec | null>(null)
+  const [year, setYear] = useState<string | null>(null)
+  const [custom, setCustomLayer] = useState<ResolvedLayer | null>(null)
+  const [highlight, setHighlight] = useState<string | null>(null)
+  const [hoveredOnMap, setHoveredOnMap] = useState<string | null>(null)
+  const layerKey = spec ? `${spec.kind}:${spec.key}` : null
+  const fetched = useAsync(layerKey, () => getMapLayer(spec!.kind, spec!.key))
+  const data: MapLayerData | null = fetched.data && spec && fetched.data.kind === spec.kind && fetched.data.key === spec.key ? fetched.data : null
+
+  const setSpec = useCallback((s: LayerSpec | null, y?: string) => {
+    setSpecState((prev) => (sameSpec(prev, s) || (!prev && !s) ? prev : s))
+    if (y) setYear(y)
+  }, [])
+
+  // Keep the year valid for the current layer (default: the latest year).
+  useEffect(() => {
+    if (data?.years && (!year || !data.years.includes(year))) setYear(data.years[data.years.length - 1])
+  }, [data, year])
+
+  const scale = useMemo(
+    () => (data ? makeScale(Object.values(data.values).flat().filter((v): v is number => v !== null), data.palette) : null),
+    [data],
+  )
+  const farmerLayer = useMemo<ResolvedLayer | null>(() => {
+    if (!data || !scale) return null
+    const i = data.years ? data.years.indexOf(year ?? '') : 0
+    if (i < 0) return null
+    return {
+      label: data.label,
+      unit: data.unit,
+      values: Object.fromEntries(Object.entries(data.values).map(([id, arr]) => [id, arr[i] ?? null])),
+      scale,
+      level: 'commune',
+      source: data.source,
+    }
+  }, [data, scale, year])
+  const layer = role === 'procurement' ? custom : farmerLayer
+
+  const selectArea = useCallback((id: string) => {
+    const u = byId.get(id)
+    if (!u) return
+    setSelectedId(id)
+    setNotice(null)
+    mapRef.current?.flyTo(u.point, u.kind === 'county' ? 7.7 : 10.2)
+  }, [byId])
+
+  const onMapSelect = useCallback((p: MapPick) => {
+    if (!p.inAoi) return setNotice(p.name)
+    setNotice(null)
+    setSelectedId(p.id)
+  }, [])
+
+  const goTo = useCallback((s: string) => {
+    const r: Role = (SECTIONS.farmer as readonly string[]).includes(s) ? 'farmer' : 'procurement'
+    setRole(r)
+    setSections((prev) => ({ ...prev, [r]: s }))
+  }, [])
+
+  const link = useMemo<MapLinkCtx>(
+    () => ({ spec, setSpec, year, setYear, years: data?.years ?? null, setCustomLayer, setHighlight, hoveredOnMap, selectArea, goTo }),
+    [spec, setSpec, year, data, hoveredOnMap, selectArea, goTo],
+  )
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <strong>SPACE2FEED</strong>
-          <span className="muted">{t('appTagline')}</span>
-        </div>
-        <nav className="tabs">
-          <button className={tab === 'farmer' ? 'on' : ''} onClick={() => setTab('farmer')}>{t('tabFarmer')}</button>
-          <button className={tab === 'procurement' ? 'on' : ''} onClick={() => setTab('procurement')}>{t('tabProcurement')}</button>
-        </nav>
-        <div className="seg lang">
-          <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>EN</button>
-          <button className={lang === 'ro' ? 'on' : ''} onClick={() => setLang('ro')}>RO</button>
-        </div>
-      </header>
-      <main className="body">
-        <aside className="map-pane">
-          <RomaniaMap
-            onSelect={(s) => s && setSel(s)}
-            initialBounds={AOI_BOUNDS}
-            choropleth={tab === 'procurement' ? choropleth : null}
-            legendLow={t('legendLow')}
-            legendHigh={t('legendHigh')}
-            legendInfo={x.procurement.choropleth}
-          />
-          <div className="selection">
-            <div className="muted tiny">{sel.kind === 'county' ? t('county') : t('commune')}</div>
-            <div className="sel-name">
-              {sel.name}
-              {sel.kind === 'commune' && <span className="muted"> · {sel.countyName}</span>}
-              <span className="muted"> · {sel.region}</span>
+    <MapLink.Provider value={link}>
+      <div className={`app ${navCollapsed ? 'nav-collapsed' : ''} ${panelOpen ? '' : 'panel-closed'}`}>
+        <Sidebar
+          role={role} setRole={setRole}
+          section={section} setSection={(s: Section) => goTo(s)}
+          collapsed={navCollapsed} setCollapsed={setNavCollapsed}
+        />
+        <div className="main">
+          <AreaBar units={units.data ?? []} selectedId={selectedId} onSelect={selectArea} notice={notice} />
+          <div className="work">
+            <div className="map-pane">
+              <RomaniaMap
+                ref={mapRef}
+                selectedId={selectedId}
+                onSelect={onMapSelect}
+                highlightId={highlight}
+                onHover={setHoveredOnMap}
+                layer={layer}
+                initialBounds={AOI_BOUNDS}
+                outsideLabel={t('outsideStudy')}
+                noDataLabel={t('noData')}
+              />
+              <MapLegend
+                layer={layer}
+                years={role === 'farmer' ? data?.years ?? null : null}
+                year={year}
+                setYear={setYear}
+                loading={role === 'farmer' && !!spec && !data}
+              />
+              {!panelOpen && (
+                <button type="button" className="panel-open-btn" onClick={() => setPanelOpen(true)}>‹ {t('showPanel')}</button>
+              )}
             </div>
-            {!inAoi && <div className="note warn small">{sel.name} {t('outsideAoi')}</div>}
-            {inAoi && <div className="muted tiny">{t('selectHint')}</div>}
+            <section className="panel" aria-label={t(`nav_${section}` as keyof Dict)}>
+              <header className="panel-head">
+                <div>
+                  <div className="panel-area">{sel?.name ?? 'Alba'}{sel?.kind === 'commune' && <span className="muted"> · {countyName}</span>}</div>
+                  <h2>{t(`nav_${section}` as keyof Dict)}</h2>
+                  <p className="muted">{t(`intro_${section}` as keyof Dict)}</p>
+                </div>
+                <button type="button" className="icon-btn" onClick={() => setPanelOpen(false)} title={t('hidePanel')} aria-label={t('hidePanel')}>
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+              </header>
+              <div className="panel-body">
+                <div hidden={role !== 'farmer'}>
+                  <FarmerView unitId={selectedId} countyName={countyName} section={sections.farmer} active={role === 'farmer'} />
+                </div>
+                <div hidden={role !== 'procurement'}>
+                  <ProcurementView section={sections.procurement} selectedCounty={countyCode} active={role === 'procurement'} />
+                </div>
+                <footer className="foot">
+                  {t('notEndorsed')} Data: NASA POWER, GPM IMERG, GLDAS, FIRMS, MODIS · ISRIC SoilGrids · JRC EUCROPMAP · INS TEMPO · geoBoundaries · © OpenStreetMap contributors.
+                </footer>
+              </div>
+            </section>
           </div>
-        </aside>
-        <section className="dash">
-          {tab === 'farmer' && (inAoi
-            ? <FarmerView key={unitId} unitId={unitId} countyName={countyName} />
-            : <p className="note warn">{sel.name} {t('outsideAoi')}</p>)}
-          {tab === 'procurement' && <ProcurementView onChoropleth={setChoropleth} selectedCounty={inAoi ? countyCode : null} />}
-          <footer className="foot muted tiny">
-            Built at the NASA Space Apps Challenge 2026 (Alba Iulia). Not endorsed by NASA. Data: NASA POWER, GPM IMERG, GLDAS, FIRMS · ISRIC SoilGrids · INS TEMPO · geoBoundaries · © OpenStreetMap contributors.
-          </footer>
-        </section>
-      </main>
-    </div>
+        </div>
+      </div>
+    </MapLink.Provider>
   )
 }
 

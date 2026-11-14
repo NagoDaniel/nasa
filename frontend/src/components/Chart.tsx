@@ -24,14 +24,29 @@ const BASE: ChartOption = {
   animationDuration: 300,
 }
 
-export default function Chart({ option, height = 200 }: { option: ChartOption; height?: number }) {
+export default function Chart({ option, height = 200, onAxisClick }: {
+  option: ChartOption
+  height?: number
+  /** Called with the category index when the plot area is clicked (whole column, not only the bar). */
+  onAxisClick?: (index: number) => void
+}) {
   const el = useRef<HTMLDivElement>(null)
   const chart = useRef<echarts.ECharts | null>(null)
+  const click = useRef(onAxisClick)
+  click.current = onAxisClick
 
   useEffect(() => {
     if (!el.current) return
     const c = echarts.init(el.current, undefined, { renderer: 'canvas' })
     chart.current = c
+    c.getZr().on('click', (e) => {
+      if (!click.current) return
+      const pt = [e.offsetX, e.offsetY]
+      if (!c.containPixel('grid', pt)) return
+      const v = c.convertFromPixel({ seriesIndex: 0 }, pt) as unknown
+      const idx = Array.isArray(v) ? v[0] : v
+      if (typeof idx === 'number' && Number.isFinite(idx)) click.current(Math.round(idx))
+    })
     const ro = new ResizeObserver(() => c.resize())
     ro.observe(el.current)
     return () => {
@@ -45,5 +60,5 @@ export default function Chart({ option, height = 200 }: { option: ChartOption; h
     chart.current?.setOption({ ...BASE, ...option }, { notMerge: true })
   }, [option])
 
-  return <div ref={el} style={{ width: '100%', height }} />
+  return <div ref={el} style={{ width: '100%', height, cursor: onAxisClick ? 'pointer' : undefined }} />
 }

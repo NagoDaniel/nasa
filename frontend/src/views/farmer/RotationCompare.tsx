@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { scoreRotations } from '../../api/client'
 import type { Priorities, RotationResult } from '../../api/types'
-import Card from '../../components/Card'
 import Chart, { PALETTE, type ChartOption } from '../../components/Chart'
 import { fmt, scoreColor } from '../../components/format'
 import Info from '../../components/Info'
@@ -10,9 +9,9 @@ import { useI18n } from '../../i18n'
 import { useExplain } from '../../i18n/explain'
 import { CROPS, cropName } from '../../i18n/names'
 
-type Rot = { name: string; crops: string[] }
+export type Rot = { name: string; crops: string[] }
 
-const PRESETS: Rot[] = [
+export const PRESETS: Rot[] = [
   { name: 'Maize – wheat – maize', crops: ['maize', 'wheat', 'maize'] },
   { name: 'Pea – maize – oats – sunflower', crops: ['pea', 'maize', 'oats', 'sunflower'] },
   { name: 'Barley – pea – wheat – maize', crops: ['barley', 'pea', 'wheat', 'maize'] },
@@ -20,10 +19,14 @@ const PRESETS: Rot[] = [
 ]
 const SUB: (keyof Priorities)[] = ['yield', 'water', 'soil', 'risk']
 
-export default function RotationCompare({ unitId, priorities }: { unitId: string; priorities: Priorities }) {
+export default function RotationCompare({ unitId, priorities, rots, setRots }: {
+  unitId: string
+  priorities: Priorities
+  rots: Rot[]
+  setRots: (r: Rot[]) => void
+}) {
   const { t, lang } = useI18n()
   const x = useExplain()
-  const [rots, setRots] = useState<Rot[]>(PRESETS.slice(0, 2))
   const [results, setResults] = useState<RotationResult[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -60,7 +63,8 @@ export default function RotationCompare({ unitId, priorities }: { unitId: string
   }, [results, t])
 
   return (
-    <Card title={t('rotations')} sub={t('rotationsSub')} info={x.general.scoreScale} right={busy ? <span className="muted small">{t('scoring')}</span> : undefined}>
+    <div className="block">
+      <p className="lead">{t('rotationsSub')} <Info>{x.general.scoreScale}</Info> {busy && <span className="muted small">{t('scoring')}</span>}</p>
       <div className="rot-editors">
         {rots.map((r, i) => (
           <div key={i} className="rot-editor" style={{ borderLeftColor: PALETTE[i] }}>
@@ -94,7 +98,7 @@ export default function RotationCompare({ unitId, priorities }: { unitId: string
         <>
           <div className="rot-charts">
             <div><h4>{t('total')} <Info>{x.rotation.totalChart}</Info></h4><Chart option={bars} height={40 + results.length * 34} /></div>
-            <div><h4>{lang === 'ro' ? 'Scoruri parțiale' : 'Sub-scores'} <Info>{x.rotation.radar}</Info></h4><Chart option={radar} height={230} /></div>
+            <div><h4>{t('subScores')} <Info>{x.rotation.radar}</Info></h4><Chart option={radar} height={230} /></div>
           </div>
           <div className="rot-details">
             {results.map((r, i) => (
@@ -118,7 +122,7 @@ export default function RotationCompare({ unitId, priorities }: { unitId: string
                       <th>{t('year')}</th>
                       <th />
                       <th className="nowrap">{t('expectedYield')} <Info>{x.rotation.expectedYield}</Info></th>
-                      <th className="nowrap">{lang === 'ro' ? 'Efecte' : 'Effects'} <Info>{x.rotation.effects}</Info></th>
+                      <th className="nowrap">{t('effects')} <Info>{x.rotation.effects}</Info></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -157,6 +161,6 @@ export default function RotationCompare({ unitId, priorities }: { unitId: string
           </div>
         </>
       )}
-    </Card>
+    </div>
   )
 }

@@ -120,3 +120,14 @@ export type ProcurementResponse = {
   assumptions: string[]
   sources: string[]
 }
+
+export type MapLayerData = {
+  kind: 'indicator' | 'agro' | 'soil' | 'cropshare'
+  key: string
+  label: string
+  unit: string
+  years: string[] | null
+  values: Record<string, (number | null)[]>
+  palette: 'blue' | 'red' | 'green' | 'brown' | 'div'
+  source: string
+}
