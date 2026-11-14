@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getArea } from '../../api/client'
 import type { Priorities } from '../../api/types'
 import { PALETTE } from '../../components/Chart'
@@ -15,7 +15,7 @@ import IndicatorChart from './IndicatorChart'
 import Overview, { type OverviewPick } from './Overview'
 import PrioritiesPanel from './PrioritiesPanel'
 import RotationCompare, { PRESETS, type Rot } from './RotationCompare'
-import SeasonEvents from './SeasonEvents'
+import SeasonEvents, { RISK_ROWS } from './SeasonEvents'
 import SeasonOutlook from './SeasonOutlook'
 import SoilCard from './SoilCard'
 
@@ -35,7 +35,7 @@ export default function FarmerView({ unitId, countyName, section, active }: {
 }) {
   const { t, lang } = useI18n()
   const x = useExplain()
-  const { setSpec } = useMapLink()
+  const { setSpec, command, goTo } = useMapLink()
   const area = useAsync(unitId, () => getArea(unitId))
   const [prio, setPrio] = useState<Priorities>({ yield: 25, water: 25, soil: 25, risk: 25 })
   const [rots, setRots] = useState<Rot[]>(PRESETS.slice(0, 2))
@@ -56,6 +56,31 @@ export default function FarmerView({ unitId, countyName, section, active }: {
     else if (section === 'crops') setSpec({ kind: 'cropshare', key: crop })
     else setSpec(null)
   }, [active, section, overview, indicator, risk, soilProp, crop, setSpec])
+
+  // Assistant: "colour the map by X" opens the section that shows X and selects it there.
+  const applied = useRef(0)
+  useEffect(() => {
+    if (!command || command.type !== 'layer' || command.seq === applied.current) return
+    applied.current = command.seq
+    const { spec, year } = command
+    if (spec.kind === 'indicator') {
+      setIndicator(spec.key)
+      if (!MAIN.includes(spec.key)) setMore(true)
+      goTo('weather')
+    } else if (spec.kind === 'agro' && RISK_ROWS.includes(spec.key)) {
+      setRisk(spec.key)
+      goTo('risks')
+    } else if (spec.kind === 'soil') {
+      setSoilProp(spec.key)
+      goTo('soil')
+    } else if (spec.kind === 'cropshare') {
+      setCrop(spec.key)
+      goTo('crops')
+    } else {
+      setOverview({ spec, year: year ?? undefined })
+      goTo('overview')
+    }
+  }, [command, goTo])
 
   if (area.error) return <p className="note warn">{t('error')}: {area.error}</p>
   if (!area.data) return <p className="muted pad">{t('loading')}</p>

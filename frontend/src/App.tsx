@@ -4,12 +4,13 @@ import type { MapLayerData } from './api/types'
 import { useAsync } from './components/useAsync'
 import { I18nProvider, useI18n } from './i18n'
 import type { Dict } from './i18n/en'
+import AssistantWidget from './assistant/AssistantWidget'
 import AreaBar from './layout/AreaBar'
 import MapLegend from './layout/MapLegend'
 import Sidebar from './layout/Sidebar'
 import RomaniaMap, { type MapHandle, type MapPick } from './map/RomaniaMap'
 import { makeScale } from './map/scales'
-import { MapLink, sameSpec, type LayerSpec, type MapLinkCtx, type ResolvedLayer } from './state/MapLink'
+import { MapLink, sameSpec, type AppCommand, type LayerSpec, type MapLinkCtx, type ResolvedLayer } from './state/MapLink'
 import { SECTIONS, type FarmerSection, type ProcurementSection, type Role, type Section } from './state/sections'
 import FarmerView from './views/farmer/FarmerView'
 import ProcurementView from './views/procurement/ProcurementView'
@@ -68,9 +69,24 @@ function Shell() {
     if (y) setYear(y)
   }, [])
 
+  // Assistant commands. A requested year waits until that layer's data has arrived.
+  const [command, setCommand] = useState<AppCommand | null>(null)
+  const cmdSeq = useRef(0)
+  const pendingYear = useRef<{ kind: string; key: string; year: string } | null>(null)
+  const runCommand = useCallback<MapLinkCtx['runCommand']>((c) => {
+    if (c.type === 'layer' && c.year) pendingYear.current = { kind: c.spec.kind, key: c.spec.key, year: c.year }
+    setCommand({ ...c, seq: ++cmdSeq.current })
+  }, [])
+
   // Keep the year valid for the current layer (default: the latest year).
   useEffect(() => {
-    if (data?.years && (!year || !data.years.includes(year))) setYear(data.years[data.years.length - 1])
+    if (!data?.years) return
+    const p = pendingYear.current
+    if (p && p.kind === data.kind && p.key === data.key) {
+      pendingYear.current = null
+      if (data.years.includes(p.year)) return setYear(p.year)
+    }
+    if (!year || !data.years.includes(year)) setYear(data.years[data.years.length - 1])
   }, [data, year])
 
   const scale = useMemo(
@@ -113,8 +129,8 @@ function Shell() {
   }, [])
 
   const link = useMemo<MapLinkCtx>(
-    () => ({ spec, setSpec, year, setYear, years: data?.years ?? null, setCustomLayer, setHighlight, hoveredOnMap, selectArea, goTo }),
-    [spec, setSpec, year, data, hoveredOnMap, selectArea, goTo],
+    () => ({ spec, setSpec, year, setYear, years: data?.years ?? null, setCustomLayer, setHighlight, hoveredOnMap, selectArea, goTo, command, runCommand }),
+    [spec, setSpec, year, data, hoveredOnMap, selectArea, goTo, command, runCommand],
   )
 
   return (
@@ -148,6 +164,7 @@ function Shell() {
                 setYear={setYear}
                 loading={role === 'farmer' && !!spec && !data}
               />
+              <AssistantWidget byId={byId} selectedId={selectedId} role={role} section={section} />
               {!panelOpen && (
                 <button type="button" className="panel-open-btn" onClick={() => setPanelOpen(true)}>‹ {t('showPanel')}</button>
               )}

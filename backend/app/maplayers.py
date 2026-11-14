@@ -28,11 +28,8 @@ def _palette(key: str) -> str:
     return "blue" if key in BLUE else "red"
 
 
-def _indicator(key: str) -> dict[str, Any]:
-    try:
-        d = store.get(f"nasa/{key}.json")
-    except FileNotFoundError:
-        raise HTTPException(404, f"Unknown indicator '{key}'")
+def yearly_layout(d: dict[str, Any]) -> tuple[list[str], dict[str, list[int]], int, bool]:
+    """Complete years of a monthly/daily NASA series: (years, indices per year, values needed, is_sum)."""
     keys: list[str] = d["keys"]
     by_year: dict[str, list[int]] = {}
     for i, k in enumerate(keys):
@@ -40,17 +37,30 @@ def _indicator(key: str) -> dict[str, Any]:
     monthly = d["period"]["step"] == "month"
     need = 12 if monthly else 20  # only complete years, so totals are comparable
     years = sorted(y for y, idx in by_year.items() if len(idx) >= need)
-    is_sum = d.get("aggregation") == "sum"
-    values = {}
-    for uid, arr in d["units"].items():
-        out = []
-        for y in years:
-            vs = [arr[i] for i in by_year[y] if arr[i] is not None]
-            if len(vs) < need:
-                out.append(None)
-            else:
-                out.append(round(sum(vs) if is_sum else sum(vs) / len(vs), 2))
-        values[uid] = out
+    return years, by_year, need, d.get("aggregation") == "sum"
+
+
+def yearly_values(arr: list, layout: tuple[list[str], dict[str, list[int]], int, bool]) -> list[float | None]:
+    """One value per complete year (sum or mean of the months), None where months are missing."""
+    years, by_year, need, is_sum = layout
+    out: list[float | None] = []
+    for y in years:
+        vs = [arr[i] for i in by_year[y] if arr[i] is not None]
+        if len(vs) < need:
+            out.append(None)
+        else:
+            out.append(round(sum(vs) if is_sum else sum(vs) / len(vs), 2))
+    return out
+
+
+def _indicator(key: str) -> dict[str, Any]:
+    try:
+        d = store.get(f"nasa/{key}.json")
+    except FileNotFoundError:
+        raise HTTPException(404, f"Unknown indicator '{key}'")
+    layout = yearly_layout(d)
+    years, _, _, is_sum = layout
+    values = {uid: yearly_values(arr, layout) for uid, arr in d["units"].items()}
     return {"label": d["label"], "unit": f"{d['unit']}/yr" if is_sum else d["unit"], "years": years, "values": values,
             "palette": _palette(key), "source": d["source"]}
 

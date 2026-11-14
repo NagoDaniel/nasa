@@ -84,3 +84,34 @@ def cropmap(uid: str) -> dict[str, Any] | None:
     except FileNotFoundError:
         return None
     return {k: v for k, v in d.items() if k != "units"} | {"values": d["units"].get(uid)}
+
+
+def rotation_context(uid: str):
+    """Inputs for rotation scoring of one unit (shared by the API and the assistant)."""
+    from .scoring.rotation import Context
+
+    unit = require_unit(uid)
+    d = ins()
+    a = agro(uid)
+    return Context(
+        unit=unit,
+        agro={"years": a["years"], "values": a["values"]},
+        soil=soil(uid)["values"],
+        terrain=(terrain(uid) or {}).get("values"),
+        ins_county=d["counties"].get(unit["county"], {}),
+        ins_ro=d["counties"].get("RO", {}),
+        traits=traits(),
+    )
+
+
+def procurement_inputs() -> tuple[dict[str, str], dict, dict, dict | None]:
+    """(counties, agro_all, fires per county, cropland NDVI per county) for scoring.procurement."""
+    counties = {u["id"]: u["name"] for u in units_index().values() if u["kind"] == "county"}
+    agro_all = store.get("derived/agro_yearly.json")
+    fires = store.get("nasa/firms_fires.json")["units"]
+    try:
+        nd = store.get("nasa/modis_ndvi.json")
+        ndvi = {"keys": nd["keys"], "units": {c: nd["units"].get(c) for c in counties}}
+    except FileNotFoundError:
+        ndvi = None
+    return counties, agro_all, {c: fires.get(c) for c in counties}, ndvi

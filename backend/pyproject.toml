@@ -9,6 +9,7 @@ dependencies = [
     "sqlmodel>=0.0.22",
     "orjson>=3.10",
     "pydantic-settings>=2.6",
+    "google-genai>=3.3.0",
 ]
 
 [dependency-groups]

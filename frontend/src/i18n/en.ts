@@ -58,8 +58,8 @@ export const en = {
   why: 'Why these scores',
   presets: 'Presets',
   scoring: 'Scoring…',
-  aiTitle: 'AI role',
-  aiBody: 'Forecasting: a statistical model (ridge regression) estimates this season’s county yield from the weather in each crop’s sensitive period; see Crops → Season outlook. It is tested on past years and hidden when it is not better than assuming a normal year. Rotation scores on this page are rule-based, not AI.',
+  aiTitle: 'AI in this tool',
+  aiBody: 'Two AI parts, each with one job. 1) Forecasting: a statistical model (ridge regression) estimates this season’s county yield from the weather in each crop’s sensitive period (Crops → Season outlook); it is tested on past years and says how much the weather signal is worth. 2) The assistant (chat button on the map) explains the numbers on this dashboard and moves the map; it only reads this project’s data, makes no forecasts of its own, and can be wrong — check figures here. Rotation scores are rule-based, not AI.',
   // procurement
   procTitle: 'Sourcing outlook by county',
   procSub: 'Field results aggregated per county for the chosen pet-food ingredient.',

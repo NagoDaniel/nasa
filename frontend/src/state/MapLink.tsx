@@ -15,6 +15,12 @@ export type ResolvedLayer = {
   source?: string
 }
 
+/** A request from the assistant, applied once (by seq) by the view that owns that state. */
+export type AppCommandInput =
+  | { type: 'layer'; spec: LayerSpec; year?: string | null }
+  | { type: 'procurement'; crop: string; metric?: 'availability' | 'quality' | 'impact' | null }
+export type AppCommand = AppCommandInput & { seq: number }
+
 export type MapLinkCtx = {
   /** Data layer shown on the map (farmer sections). */
   spec: LayerSpec | null
@@ -31,6 +37,9 @@ export type MapLinkCtx = {
   /** Select an area from the data side (flies the map there). */
   selectArea: (id: string) => void
   goTo: (section: string) => void
+  /** Last assistant command (colour the map by a layer / pick a procurement crop). */
+  command: AppCommand | null
+  runCommand: (c: AppCommandInput) => void
 }
 
 export const MapLink = createContext<MapLinkCtx | null>(null)

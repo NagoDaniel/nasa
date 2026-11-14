@@ -1,5 +1,5 @@
 import type { FeatureCollection } from 'geojson'
-import type { AreaBundle, Forecast, MapLayerData, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
+import type { AreaBundle, AssistantStatus, ChatContext, ChatResponse, ChatTurn, Forecast, MapLayerData, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
 
 const BASE = '/api'
 
@@ -34,3 +34,21 @@ export const scoreRotations = (unit: string, priorities: Priorities, rotations: 
     body: JSON.stringify({ unit, priorities, rotations }),
     signal,
   })
+
+export const getAssistantStatus = () => getJson<AssistantStatus>('/assistant/status')
+
+/** Chat with the assistant. 429 / 503 still carry a normal reply (with retryAfter in seconds). */
+export async function postChat(message: string, history: ChatTurn[], context: ChatContext, signal?: AbortSignal): Promise<ChatResponse & { retryAfter?: number }> {
+  const res = await fetch(`${BASE}/assistant/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, history, context }),
+    signal,
+  })
+  if (res.ok || res.status === 429 || res.status === 503) {
+    const body = (await res.json()) as ChatResponse
+    const ra = Number(res.headers.get('Retry-After'))
+    return res.ok ? body : { ...body, retryAfter: Number.isFinite(ra) && ra > 0 ? ra : 30 }
+  }
+  throw new Error(String(res.status))
+}
