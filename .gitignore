@@ -14,3 +14,6 @@ frontend/dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Raw downloaded data (too large for git; see dataset_dani.md and data_manifest_dani.tsv)
+data/
