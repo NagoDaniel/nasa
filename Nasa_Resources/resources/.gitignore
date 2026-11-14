@@ -1,0 +1,14 @@
+# Local credentials and session files
+.env
+.env.*
+*.token
+*.cookies
+.netrc
+*credentials*.json
+# Large working datasets; publish reviewed derivatives separately
+data/raw/
+data/processed/
+# Local operating-system/editor files
+.DS_Store
+Thumbs.db
+__pycache__/
