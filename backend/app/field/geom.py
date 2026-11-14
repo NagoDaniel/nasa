@@ -71,6 +71,26 @@ def check_size(poly: Polygon) -> float:
 _communes: dict = {"src": None}
 
 
+def _commune_index() -> dict:
+    fc = store.get("geo/communes.geojson.json")
+    if _communes["src"] is not fc:
+        geoms = [shape(f["geometry"]) for f in fc["features"]]
+        _communes.update(src=fc, geoms=geoms, props=[f["properties"] for f in fc["features"]], tree=STRtree(geoms))
+    return _communes
+
+
+def commune_at(lon: float, lat: float) -> dict | None:
+    """Study-area commune containing a point (None outside the study area)."""
+    from shapely.geometry import Point
+
+    idx = _commune_index()
+    pt = Point(lon, lat)
+    for i in idx["tree"].query(pt, predicate="intersects"):
+        p = idx["props"][i]
+        return {"id": p["id"], "name": p["name"], "county": p["county"], "county_name": p["county_name"]}
+    return None
+
+
 def commune_of(poly: Polygon) -> dict | None:
     """Study-area commune holding most of the field (None outside the study area)."""
     fc = store.get("geo/communes.geojson.json")

@@ -2,12 +2,14 @@ import { useMemo } from 'react'
 import type { Unit } from '../api/types'
 import { fmt } from '../components/format'
 import { useI18n } from '../i18n'
+import PlaceSearch, { type Located } from './PlaceSearch'
 
 /** Pick the area by name (the map is the other way to pick it). */
-export default function AreaBar({ units, selectedId, onSelect, notice }: {
+export default function AreaBar({ units, selectedId, onSelect, onLocate, notice }: {
   units: Unit[]
   selectedId: string
   onSelect: (id: string) => void
+  onLocate: (l: Located) => void
   notice: string | null
 }) {
   const { t, lang } = useI18n()
@@ -20,6 +22,7 @@ export default function AreaBar({ units, selectedId, onSelect, notice }: {
   )
   return (
     <div className="areabar">
+      <PlaceSearch units={units} onLocate={onLocate} />
       <label>
         <span>{t('county')}</span>
         <select value={county} onChange={(e) => onSelect(e.target.value)}>

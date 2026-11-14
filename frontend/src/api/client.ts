@@ -1,5 +1,5 @@
 import type { FeatureCollection } from 'geojson'
-import type { AreaBundle, AssistantStatus, FieldContextResp, FieldMeasure, FieldPolygon, SavedField, VegJob, ChatContext, ChatResponse, ChatTurn, Forecast, HarvestReport, Learning, MapLayerData, PlanAnswers, PlannerField, PlanResponse, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
+import type { AreaBundle, AssistantStatus, FieldContextResp, FieldMeasure, FieldPolygon, SavedField, VegJob, ChatContext, ChatResponse, ChatTurn, Forecast, HarvestReport, Learning, MapLayerData, PlaceResult, PlanAnswers, PlannerField, PlanResponse, Priorities, ProcurementResponse, ScoreResponse, Unit } from './types'
 
 const BASE = '/api'
 
@@ -71,3 +71,7 @@ export const getPlannerField = (id: number) => getJson<PlannerField>(`/planner/f
 export const makePlan = (id: number, answers: PlanAnswers) => post<PlanResponse>(`/planner/fields/${id}/plan`, answers)
 export const addHarvestReport = (id: number, r: Omit<HarvestReport, 'id' | 'field_id' | 'source' | 'county'>) =>
   post<{ saved: boolean; learning: Learning }>(`/planner/fields/${id}/reports`, r)
+
+// ---------- place search (OpenStreetMap Nominatim via the backend) ----------
+export const searchPlaces = (q: string, lang: string) =>
+  getJson<{ query: string; results: PlaceResult[]; attribution: string }>(`/geocode?q=${encodeURIComponent(q)}&lang=${lang}`)
