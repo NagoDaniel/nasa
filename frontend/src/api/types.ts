@@ -118,6 +118,7 @@ export type ProcurementResponse = {
   proxy: string | null
   counties: Record<string, CountyProcurement>
   recommendations: Recommendation[]
+  outlook: Forecast | null
   assumptions: string[]
   sources: string[]
 }
@@ -147,4 +148,48 @@ export type Terrain = {
     cropland_steep_share_pct?: number
     landcover_pct?: Record<string, number>
   }
+}
+
+export type ForecastModel = {
+  predictors: { key: string; label: string; unit: string; effect_pct_per_unit: number }[]
+  n_county_years: number
+  years: [number, number]
+  mae_pct: number
+  mae_normal_year_pct: number
+  skill_pct: number
+  reliable: boolean
+  signal: 'strong' | 'weak' | 'none'
+  intervals_pct: Record<string, [number, number]>
+}
+
+export type CountyForecast = {
+  forecast: null | {
+    year: number
+    median_kg_ha: number
+    long_median_kg_ha: number
+    yield_kg_ha: number
+    intervals_kg_ha: Record<string, [number, number]>
+    low_kg_ha: number
+    high_kg_ha: number
+    anomaly_pct: number
+    contributions: { key: string; label: string; value: number; unit: string; effect_pct: number }[]
+    model: ForecastModel
+    supply: null | {
+      area_ha: number; area_year: number; production_t: number; intervals_t: Record<string, [number, number]>
+      low_t: number; high_t: number; normal_t: number; vs_normal_pct: number; latest_t: number | null; latest_year: number | null
+    }
+  }
+  history: { year: number; actual_kg_ha: number | null; predicted_kg_ha: number | null; low_kg_ha: number | null; high_kg_ha: number | null }[]
+}
+
+export type Forecast = {
+  crop: string
+  proxy: string | null
+  model: ForecastModel | null
+  coverage_80_pct: number | null
+  counties: Record<string, CountyForecast>
+  region: null | { year: number; counties: string[]; production_t: number; low_t: number; high_t: number; normal_t: number; latest_t: number; signal: 'strong' | 'weak' }
+  method: string[]
+  limits: string[]
+  sources: string[]
 }

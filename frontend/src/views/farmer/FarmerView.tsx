@@ -16,6 +16,7 @@ import Overview, { type OverviewPick } from './Overview'
 import PrioritiesPanel from './PrioritiesPanel'
 import RotationCompare, { PRESETS, type Rot } from './RotationCompare'
 import SeasonEvents from './SeasonEvents'
+import SeasonOutlook from './SeasonOutlook'
 import SoilCard from './SoilCard'
 
 const MAIN = ['imerg_precip', 'modis_ndvi', 'smap_soil_moisture', 'gldas_rootmoist', 'power_heat_days', 'modis_et', 'grace_tws', 'firms_fires']
@@ -95,6 +96,9 @@ export default function FarmerView({ unitId, countyName, section, active }: {
               <CropMixCard cm={a.cropmap} stats={a.crop_stats} kind={kind} selected={crop} onSelect={setCrop} />
             </Collapsible>
           )}
+          <Collapsible id="crops-outlook" title={`${t('outlookTitle')}: ${countyName}`} info={x.outlook} defaultOpen>
+            <SeasonOutlook county={a.unit.county} countyName={countyName} />
+          </Collapsible>
           <Collapsible id="crops-yields" title={`${t('countyYields')}: ${countyName}`} info={x.cropStats}>
             <CropStatsCard stats={a.crop_stats} />
           </Collapsible>

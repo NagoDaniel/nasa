@@ -29,37 +29,43 @@ CONF = {
     "county": "medium",
     "commune": "low",
     "note": "Regional grid: neighbouring communes share the same cells, so commune values describe the surrounding region, not the commune itself. "
-    "2026 (Jan–Oct) only exists for the 9 cells around Alba Iulia (roughly Alba, Sibiu and parts of the neighbouring counties).",
+    "The latest months can be provisional (POWER lags real time by a few days).",
 }
+
+
+def _read_csv(f) -> pd.DataFrame:
+    lines = f.read_text().splitlines()
+    start = next(i for i, l in enumerate(lines) if l.startswith("YEAR,DOY"))
+    df = pd.read_csv(f, skiprows=start).replace(-999, np.nan)
+    df.index = pd.to_datetime(df["YEAR"].astype(str) + df["DOY"].astype(str).str.zfill(3), format="%Y%j")
+    return df
 
 
 @lru_cache(maxsize=1)
 def load_power_grid():
-    files = sorted(raw("nasa_power/daily_grid").glob("power_daily_*.csv"))
-    if not files:
+    """Daily grid from every nasa_power/daily_grid* folder (2015–2025 base + extra periods), per cell."""
+    cells: dict[tuple[float, float], list] = {}
+    for d in sorted(raw("nasa_power").glob("daily_grid*")):
+        for f in sorted(d.glob("power_daily_*.csv")):
+            m = re.match(r"power_daily_(-?[\d.]+)_(-?[\d.]+)\.csv", f.name)
+            cells.setdefault((float(m.group(1)), float(m.group(2))), []).append(f)
+    if not cells:
         raise SystemExit("POWER files not found")
-    pts = []
-    for f in files:
-        m = re.match(r"power_daily_(-?[\d.]+)_(-?[\d.]+)\.csv", f.name)
-        pts.append((float(m.group(1)), float(m.group(2)), f))
-    lats = sorted({p[0] for p in pts})
-    lons = sorted({p[1] for p in pts})
-    dates = None
-    arrs = {p: None for p in PARAMS}
-    for la, lo, f in pts:
-        lines = f.read_text().splitlines()
-        start = next(i for i, l in enumerate(lines) if l.startswith("YEAR,DOY"))
-        df = pd.read_csv(f, skiprows=start)
-        df = df.replace(-999, np.nan)
-        d = pd.to_datetime(df["YEAR"].astype(str) + df["DOY"].astype(str).str.zfill(3), format="%Y%j")
-        if dates is None:
-            dates = pd.DatetimeIndex(d)
-            for p in PARAMS:
-                arrs[p] = np.full((len(d), len(lats), len(lons)), np.nan)
+    lats = sorted({k[0] for k in cells})
+    lons = sorted({k[1] for k in cells})
+    frames = {}
+    for key, fs in cells.items():
+        df = pd.concat([_read_csv(f) for f in fs]).sort_index()
+        frames[key] = df[~df.index.duplicated(keep="last")]
+    dates = pd.date_range(min(df.index[0] for df in frames.values()), max(df.index[-1] for df in frames.values()), freq="D")
+    arrs = {p: np.full((len(dates), len(lats), len(lons)), np.nan) for p in PARAMS}
+    for (la, lo), df in frames.items():
+        df = df.reindex(dates)
         i, j = lats.index(la), lons.index(lo)
         for p in PARAMS:
-            arrs[p][:, i, j] = df[p].to_numpy(dtype=float)
-    return _extend_with_points(dates, np.array(lats), np.array(lons), arrs)
+            if p in df:
+                arrs[p][:, i, j] = df[p].to_numpy(dtype=float)
+    return _extend_with_points(pd.DatetimeIndex(dates), np.array(lats), np.array(lons), arrs)
 
 
 def _extend_with_points(dates, lats, lons, arrs):
@@ -121,8 +127,13 @@ def flag(cond: np.ndarray, src: np.ndarray) -> np.ndarray:
     return np.where(np.isnan(src), np.nan, cond.astype(float))
 
 
+SERIES_START = "2015-01-01"
+
+
 def main() -> None:
     dates, _, _, a = load_power_grid()
+    keep = dates >= pd.Timestamp(SERIES_START)
+    dates, a = dates[keep], {k: v[keep] for k, v in a.items()}
     gw = power_weights()
     period = {"start": dates[0].strftime("%Y-%m-%d"), "end": dates[-1].strftime("%Y-%m-%d"), "step": "month"}
     base = {"source": SOURCE, "period": period, "resolution": RES, "confidence": CONF, "status": "complete"}

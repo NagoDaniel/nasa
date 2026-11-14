@@ -58,8 +58,8 @@ export const en = {
   why: 'Why these scores',
   presets: 'Presets',
   scoring: 'Scoring…',
-  aiTitle: 'AI assistant',
-  aiBody: 'The AI role (forecasting, risk classification or an explainer) is not defined yet. Nothing on this page is AI-generated.',
+  aiTitle: 'AI role',
+  aiBody: 'Forecasting: a statistical model (ridge regression) estimates this season’s county yield from the weather in each crop’s sensitive period; see Crops → Season outlook. It is tested on past years and hidden when it is not better than assuming a normal year. Rotation scores on this page are rule-based, not AI.',
   // procurement
   procTitle: 'Sourcing outlook by county',
   procSub: 'Field results aggregated per county for the chosen pet-food ingredient.',
@@ -145,6 +145,7 @@ export const en = {
   clayShare: 'clay',
   cropMixTitle: 'Crop mix (satellite crop map)',
   cropMixSub: 'Hectares per crop on arable land',
+  outlookTitle: 'Season outlook (yield forecast)',
   countyYields: 'Yields in the county (official statistics)',
   effects: 'Effects',
   subScores: 'Sub-scores',
