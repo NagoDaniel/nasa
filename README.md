@@ -34,7 +34,7 @@ sections, colour the map, and explain the numbers that are already in this dashb
 
 - **Deterministic first.** Place names ("zoom to Aiud", "Ineu" → pick one of two), section
   commands ("open soil") and greetings are handled by plain code, no AI involved.
-- **Google Gemini** (`gemini-2.5-flash` by default) handles other questions. It can only
+- **Google Gemini** (`gemini-3.8-flash` by default) handles other questions. It can only
   call fixed, read-only tools that run the dashboard's own code over this project's data
   (indicators, season hazards, soil, INS statistics, rotation scores, procurement scores)
   and propose UI actions (select area, open section, colour map). It cannot write, browse

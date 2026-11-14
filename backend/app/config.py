@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # --- AI assistant (app/assistant). The key stays on the server; without it the assistant
     # still answers navigation / help requests with deterministic code.
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.8-flash"
     gemini_thinking_budget: int = 0  # 0 = no thinking (fast, cheap); -1 = model default
     assistant_max_chars: int = 500  # per user message
     assistant_max_history: int = 6  # previous turns sent back to the model
