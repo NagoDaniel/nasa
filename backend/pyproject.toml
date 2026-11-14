@@ -1,0 +1,22 @@
+[project]
+name = "space2feed-backend"
+version = "0.1.0"
+description = "SPACE2FEED / Field Shift backend (FastAPI)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlmodel>=0.0.22",
+    "orjson>=3.10",
+    "pydantic-settings>=2.6",
+]
+
+[dependency-groups]
+scripts = [
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "requests>=2.32",
+]
+
+[tool.uv]
+package = false

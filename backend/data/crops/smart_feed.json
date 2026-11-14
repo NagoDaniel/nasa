@@ -1,0 +1,17 @@
+{
+  "direction": "B",
+  "name": "SMART FEED (pet food)",
+  "crops": [
+    {"id": "oats",      "en": "Oats",            "ro": "Ovăz",                "hu": "Zab"},
+    {"id": "barley",    "en": "Barley",          "ro": "Orz",                 "hu": "Árpa"},
+    {"id": "maize",     "en": "Maize",           "ro": "Porumb",              "hu": "Kukorica"},
+    {"id": "pea",       "en": "Pea",             "ro": "Mazăre",              "hu": "Borsó"},
+    {"id": "chickpea",  "en": "Chickpea",        "ro": "Năut",                "hu": "Csicseriborsó"},
+    {"id": "flax",      "en": "Flax",            "ro": "In",                  "hu": "Len"},
+    {"id": "sunflower", "en": "Sunflower (oil)", "ro": "Floarea-soarelui",    "hu": "Napraforgó"}
+  ],
+  "other_ingredients": [
+    {"id": "poultry_protein", "en": "Poultry protein", "ro": "Proteină de pasăre", "hu": "Baromfifehérje",
+     "note": "Impact depends on the crops in the poultry feed"}
+  ]
+}

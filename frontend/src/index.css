@@ -1,0 +1,27 @@
+:root {
+  --bg: #eef1f4;
+  --panel: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; }
+.app { display: flex; flex-direction: column; height: 100%; }
+.topbar { display: flex; gap: 12px; align-items: baseline; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.body { flex: 1; display: flex; min-height: 0; }
+.map { flex: 1; min-width: 0; background: var(--bg); }
+.panel { width: 300px; padding: 16px; background: var(--panel); border-left: 1px solid var(--border); overflow-y: auto; }
+.panel h2 { font-size: 16px; margin: 0 0 12px; }
+.panel h3 { font-size: 13px; margin: 24px 0 8px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+dl { margin: 0; } dt { font-size: 12px; color: var(--muted); margin-top: 10px; } dd { margin: 2px 0 0; font-weight: 600; }
+.muted { color: var(--muted); font-weight: 400; } .small { font-size: 12px; }
+.legend { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 13px; }
+.legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 8px; vertical-align: -2px; opacity: .8; }
+@media (max-width: 720px) {
+  .body { flex-direction: column; }
+  .panel { width: auto; max-height: 40%; border-left: 0; border-top: 1px solid var(--border); }
+}
