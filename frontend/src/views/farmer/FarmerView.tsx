@@ -13,10 +13,10 @@ import RotationCompare from './RotationCompare'
 import SeasonEvents from './SeasonEvents'
 import SoilCard from './SoilCard'
 
-const MAIN = ['imerg_precip', 'gldas_rootmoist', 'power_heat_days', 'gldas_et', 'firms_fires', 'power_tmax', 'modis_ndvi']
+const MAIN = ['imerg_precip', 'modis_ndvi', 'smap_soil_moisture', 'gldas_rootmoist', 'power_heat_days', 'modis_et', 'grace_tws', 'firms_fires']
 const COLORS: Record<string, string> = {
-  imerg_precip: PALETTE[0], gldas_rootmoist: PALETTE[5], power_heat_days: PALETTE[4], gldas_et: PALETTE[2],
-  firms_fires: PALETTE[1], power_tmax: PALETTE[7], modis_ndvi: PALETTE[6],
+  imerg_precip: PALETTE[0], gldas_rootmoist: PALETTE[5], power_heat_days: PALETTE[4], modis_et: PALETTE[2],
+  firms_fires: PALETTE[1], grace_tws: PALETTE[7], modis_ndvi: PALETTE[6], smap_soil_moisture: PALETTE[3],
 }
 
 export default function FarmerView({ unitId, countyName }: { unitId: string; countyName: string }) {
@@ -44,7 +44,7 @@ export default function FarmerView({ unitId, countyName }: { unitId: string; cou
 
       <SeasonEvents agro={a.agro_yearly} kind={kind} />
       <div className="grid two">
-        <SoilCard soil={a.soil} kind={kind} />
+        <SoilCard soil={a.soil} terrain={a.terrain} kind={kind} />
         <CropStatsCard stats={a.crop_stats} countyName={countyName} />
       </div>
       {a.cropmap && <CropMixCard cm={a.cropmap} stats={a.crop_stats} kind={kind} />}

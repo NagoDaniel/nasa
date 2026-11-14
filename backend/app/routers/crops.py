@@ -55,6 +55,7 @@ def score(req: ScoreRequest) -> dict[str, Any]:
         unit=unit,
         agro={"years": agro["years"], "values": agro["values"]},
         soil=ds.soil(req.unit)["values"],
+        terrain=(ds.terrain(req.unit) or {}).get("values"),
         ins_county=ins["counties"].get(unit["county"], {}),
         ins_ro=ins["counties"].get("RO", {}),
         traits=ds.traits(),
@@ -74,4 +75,9 @@ def procurement_view(crop: str) -> dict[str, Any]:
     counties = {u["id"]: u["name"] for u in ds.units_index().values() if u["kind"] == "county"}
     agro_all = ds.store.get("derived/agro_yearly.json")
     fires = ds.store.get("nasa/firms_fires.json")["units"]
-    return procurement(crop, counties, ds.ins(), agro_all, traits, {c: fires.get(c) for c in counties})
+    try:
+        nd = ds.store.get("nasa/modis_ndvi.json")
+        ndvi = {"keys": nd["keys"], "units": {c: nd["units"].get(c) for c in counties}}
+    except FileNotFoundError:
+        ndvi = None
+    return procurement(crop, counties, ds.ins(), agro_all, traits, {c: fires.get(c) for c in counties}, ndvi)

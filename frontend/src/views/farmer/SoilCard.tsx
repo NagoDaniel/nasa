@@ -1,4 +1,4 @@
-import type { Soil } from '../../api/types'
+import type { Soil, Terrain } from '../../api/types'
 import Card from '../../components/Card'
 import { fmt } from '../../components/format'
 import Info from '../../components/Info'
@@ -8,7 +8,7 @@ import { useExplain } from '../../i18n/explain'
 
 const ORDER = ['soc', 'phh2o', 'clay', 'sand', 'silt', 'nitrogen', 'bdod', 'cec']
 
-export default function SoilCard({ soil, kind }: { soil: Soil; kind: 'county' | 'commune' }) {
+export default function SoilCard({ soil, terrain, kind }: { soil: Soil; terrain: Terrain | null; kind: 'county' | 'commune' }) {
   const { t } = useI18n()
   const x = useExplain()
   const v = soil.values
@@ -36,6 +36,39 @@ export default function SoilCard({ soil, kind }: { soil: Soil; kind: 'county' | 
       </div>
       {ph !== undefined && ph < 6 && <p className="note warn">{t('acidic')}</p>}
       <SourceNote source={soil.source} period={soil.depth} resolution={soil.resolution} confidence={soil.confidence[kind]} note={soil.confidence.note} />
+      {terrain && <TerrainRows tr={terrain} kind={kind} />}
     </Card>
+  )
+}
+
+function TerrainRows({ tr, kind }: { tr: Terrain; kind: 'county' | 'commune' }) {
+  const v = tr.values
+  const lc = v.landcover_pct ?? {}
+  const cells: [string, string][] = []
+  if (v.elevation_m !== undefined) cells.push(['Mean elevation', `${fmt(v.elevation_m, 0)} m`])
+  if (v.cropland_slope_pct !== undefined) cells.push(['Cropland slope (mean)', `${fmt(v.cropland_slope_pct, 1)} %`])
+  if (v.cropland_steep_share_pct !== undefined) cells.push([`Cropland ≥ ${tr.steep_threshold_pct} % slope`, `${fmt(v.cropland_steep_share_pct, 1)} %`])
+  if (lc['40'] !== undefined) cells.push(['Cropland share', `${fmt(lc['40'], 1)} %`])
+  if (lc['30'] !== undefined) cells.push(['Grassland share', `${fmt(lc['30'], 1)} %`])
+  if (lc['10'] !== undefined) cells.push(['Tree cover share', `${fmt(lc['10'], 1)} %`])
+  if (!cells.length) return null
+  return (
+    <>
+      <div className="soil-grid">
+        {cells.map(([label, val]) => (
+          <div key={label} className="soil-cell">
+            <div className="muted small">{label}</div>
+            <div className="big">{val}</div>
+          </div>
+        ))}
+      </div>
+      <SourceNote
+        source={`${tr.sources.terrain}; ${tr.sources.landcover}`}
+        period="SRTM 2000 · WorldCover 2021"
+        resolution={`${tr.resolution.terrain} / ${tr.resolution.landcover}`}
+        confidence={tr.confidence[kind]}
+        note={tr.confidence.note}
+      />
+    </>
   )
 }

@@ -13,7 +13,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-STEPS = ["units", "power", "imerg", "gldas", "firms", "agro_yearly", "soil", "ins", "cropmap", "ndvi"]
+STEPS = ["units", "power", "imerg", "gldas", "firms", "agro_yearly", "soil", "ins", "cropmap", "modis", "smap", "grace", "terrain"]
 
 
 def main() -> None:

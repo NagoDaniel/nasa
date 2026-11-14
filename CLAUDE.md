@@ -167,11 +167,14 @@ cd frontend && pnpm build                                                    # t
 | `crops/ins_stats.json` | INS area / production / yield per county (+ RO total), 2015–2025; grain-legume yield derived as production ÷ area |
 | `crops/cropmap.json` | EUCROPMAP 2018 / 2022 ha per class per unit (counted at 100 m) |
 | `crops/crop_traits.json` | hand-curated crop traits with references (FAO, Ecocrop, IPCC, Peoples 2009, Preissel 2015…) + scoring assumptions |
+| `land/terrain.json` | SRTM elevation / slope (all land + cropland) and ESA WorldCover 2021 land-cover shares, units covered ≥ 95 % by the tiles |
 
 - Gridded data → units: area-weighted overlap of grid cells (`scripts/process/common.py: grid_weights/aggregate`); rasters → units: commune label raster (`zonal.py`), counties = union of their communes.
 - Confidence convention: each dataset has `confidence.county` / `.commune` + a note; coarse grids (POWER ~50 km, GLDAS ~25 km) are "low" for communes.
 - Hazard thresholds (`app/scoring/hazards.py`): heat ones physiological; rain / wet-day / dry-spell ones ≈ regional 75th percentile 2015–2025. They are shown in the UI.
-- **Known gaps:** GLDAS 2015-01 raw file is a bad download (holds IMERG) → empty month; IMERG Final ends 2025-09; MODIS NDVI is only the Alba 2024 AppEEARS sample (`status: "sample"`) — when the full AppEEARS set lands in `.cache/raw/vegetation/...`, rerun `build_all.py ndvi`; other AppEEARS products (MOD16 ET, MOD11 LST, SMAP, ECOSTRESS, HLS) are not processed yet. Chickpea has no INS statistics (uses grain legumes as proxy, low confidence). EUCROPMAP county totals differ from INS by up to 30–50% → use INS for volumes.
+- **Two raw folders:** `backend/.cache/raw/` (2015–2025 AOI clips, `dataset.md`) and `<repo>/data/` (gitignored, 2021-11 – 2026-10 Alba-Iulia box + MODIS h19v04 tile + global GLDAS/GRACE, `dataset_dani.md`; env `S2F_RAW_EXTRA_DIR`). Steps `modis`, `smap`, `grace`, `terrain` read only `<repo>/data`. **The local `.cache/raw` may be a partial copy** — don't rerun `imerg`, `firms`, `soil`, `cropmap` unless the full set is there; `gldas` merges with the existing JSON, `power` and `agro_yearly` are safe.
+- **2026:** POWER (Jan–Oct) only for 9 cells around Alba Iulia → `agro_yearly` has 2026 for ~260 units (AB, SB counties); GLDAS ends 2026-07, so 2026 water balance / summer soil-moisture z are empty. Procurement "this season" = each county's latest year with data.
+- **Known gaps:** GLDAS 2015-01 raw file is a bad download (holds IMERG) → empty month; IMERG Final ends 2025-09; SMAP only covers ~100 units around Alba Iulia (quality flag drops forested cells) and was still downloading (rerun `build_all.py smap`); MODIS cropland series missing for Vâlcea + units outside WorldCover tiles; ECOSTRESS, HLS, MOD13Q1 250 m not processed. Chickpea has no INS statistics (uses grain legumes as proxy, low confidence). EUCROPMAP county totals differ from INS by up to 30–50% → use INS for volumes.
 
 Raw datasets (NASA and supplementary) are downloaded to `backend/.cache/raw/` (gitignored). **Read `dataset.md` before touching raw data**: it lists every dataset's files, structure, units and quirks.
 

@@ -4,7 +4,8 @@ Four sub-scores, 0–100 (higher = better), each with the factors that produced 
   yield  – local yield level vs Romania (INS), rotation effects, soil pH fit
   water  – crop water need vs dry-year growing-season rain in this area
   soil   – legumes, crop diversity, winter cover, rotation intervals
-  risk   – how often the crop's sensitive window was hit by hazards here (2015–2025)
+  risk   – how often the crop's sensitive window was hit by hazards here (2015–2025,
+           plus 2026 where NASA POWER has it)
            and how much the county yield swung (INS)
 Total = priority-weighted mean of the four. Pure functions: all inputs are passed in.
 """
@@ -40,6 +41,7 @@ class Context:
     ins_ro: dict
     traits: dict  # crop_traits.json
     years: list[int] = field(default_factory=list)
+    terrain: dict | None = None  # SRTM / WorldCover record (land/terrain.json), if the unit is covered
 
 
 def _r(x: float | None, nd: int = 0) -> str:
@@ -218,6 +220,14 @@ def score_rotation(ctx: Context, crops: list[str], priorities: dict[str, float])
         factors["soil"].append(Factor(
             "Soil organic carbon here (context)", f"{ctx.soil['soc']['median']} g/kg (0–30 cm, {ctx.soil.get('texture', '')})",
             "·", "ISRIC SoilGrids 2.0", "Shown for context; not part of the score."))
+    if ctx.terrain and ctx.terrain.get("cropland_slope_pct") is not None:
+        bare = [c for c in dict.fromkeys(crops) if not tr[c]["winter_cover"]]
+        factors["soil"].append(Factor(
+            "Cropland slope here (context)",
+            f"mean {ctx.terrain['cropland_slope_pct']} %; {ctx.terrain['cropland_steep_share_pct']} % of cropland ≥ 10 % slope",
+            "·", "NASA SRTM GL1 (30 m) + ESA WorldCover 2021 cropland",
+            "Shown for context; not part of the score. On slopes ≥ ~10 % bare soil erodes quickly, so the years without "
+            f"winter cover ({', '.join(bare) or 'none'}) matter most there."))
 
     sub = {
         "yield": sum(y_scores) / n,
