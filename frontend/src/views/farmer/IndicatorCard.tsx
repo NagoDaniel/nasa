@@ -3,8 +3,10 @@ import type { Indicator } from '../../api/types'
 import Card from '../../components/Card'
 import Chart, { type ChartOption } from '../../components/Chart'
 import { fmt } from '../../components/format'
+import Info from '../../components/Info'
 import SourceNote from '../../components/SourceNote'
 import { useI18n } from '../../i18n'
+import { useExplain } from '../../i18n/explain'
 import { indicatorLabel } from '../../i18n/names'
 
 const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
@@ -47,6 +49,7 @@ function monthly(ind: Indicator) {
 
 export default function IndicatorCard({ ind, color, kind }: { ind: Indicator; color: string; kind: 'county' | 'commune' }) {
   const { t, lang } = useI18n()
+  const x = useExplain()
   // a one-year sample has no meaningful per-year view
   const [mode, setMode] = useState<'annual' | 'seasonal'>(ind.status === 'sample' ? 'seasonal' : 'annual')
   const ys = useMemo(() => yearly(ind), [ind])
@@ -95,11 +98,15 @@ export default function IndicatorCard({ ind, color, kind }: { ind: Indicator; co
   return (
     <Card
       title={<>{indicatorLabel(ind.name, ind.label, lang)} {ind.status === 'sample' && <span className="badge sample">{t('sample')}</span>}</>}
+      info={x.indicators[ind.name] ?? ind.label}
       sub={`${ind.variable} · ${ind.unit}`}
       right={
-        <div className="seg">
-          <button className={mode === 'annual' ? 'on' : ''} onClick={() => setMode('annual')}>{t('annual')}</button>
-          <button className={mode === 'seasonal' ? 'on' : ''} onClick={() => setMode('seasonal')}>{t('seasonal')}</button>
+        <div className="nowrap">
+          <div className="seg">
+            <button className={mode === 'annual' ? 'on' : ''} onClick={() => setMode('annual')}>{t('annual')}</button>
+            <button className={mode === 'seasonal' ? 'on' : ''} onClick={() => setMode('seasonal')}>{t('seasonal')}</button>
+          </div>{' '}
+          <Info>{mode === 'annual' ? x.general.perYear : x.general.byMonth}</Info>
         </div>
       }
     >

@@ -4,8 +4,10 @@ import type { Priorities, RotationResult } from '../../api/types'
 import Card from '../../components/Card'
 import Chart, { PALETTE, type ChartOption } from '../../components/Chart'
 import { fmt, scoreColor } from '../../components/format'
+import Info from '../../components/Info'
 import { ConfidenceBadge } from '../../components/SourceNote'
 import { useI18n } from '../../i18n'
+import { useExplain } from '../../i18n/explain'
 import { CROPS, cropName } from '../../i18n/names'
 
 type Rot = { name: string; crops: string[] }
@@ -20,6 +22,7 @@ const SUB: (keyof Priorities)[] = ['yield', 'water', 'soil', 'risk']
 
 export default function RotationCompare({ unitId, priorities }: { unitId: string; priorities: Priorities }) {
   const { t, lang } = useI18n()
+  const x = useExplain()
   const [rots, setRots] = useState<Rot[]>(PRESETS.slice(0, 2))
   const [results, setResults] = useState<RotationResult[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -57,7 +60,7 @@ export default function RotationCompare({ unitId, priorities }: { unitId: string
   }, [results, t])
 
   return (
-    <Card title={t('rotations')} sub={t('rotationsSub')} right={busy ? <span className="muted small">{t('scoring')}</span> : undefined}>
+    <Card title={t('rotations')} sub={t('rotationsSub')} info={x.general.scoreScale} right={busy ? <span className="muted small">{t('scoring')}</span> : undefined}>
       <div className="rot-editors">
         {rots.map((r, i) => (
           <div key={i} className="rot-editor" style={{ borderLeftColor: PALETTE[i] }}>
@@ -90,8 +93,8 @@ export default function RotationCompare({ unitId, priorities }: { unitId: string
       {results && bars && radar && (
         <>
           <div className="rot-charts">
-            <div><h4>{t('total')}</h4><Chart option={bars} height={40 + results.length * 34} /></div>
-            <div><Chart option={radar} height={230} /></div>
+            <div><h4>{t('total')} <Info>{x.rotation.totalChart}</Info></h4><Chart option={bars} height={40 + results.length * 34} /></div>
+            <div><h4>{lang === 'ro' ? 'Scoruri parțiale' : 'Sub-scores'} <Info>{x.rotation.radar}</Info></h4><Chart option={radar} height={230} /></div>
           </div>
           <div className="rot-details">
             {results.map((r, i) => (
@@ -103,19 +106,27 @@ export default function RotationCompare({ unitId, priorities }: { unitId: string
                 <div className="score-row">
                   {SUB.map((k) => (
                     <div key={k} className="score-chip" style={{ borderColor: scoreColor(r.scores[k]) }}>
-                      <span className="muted small">{t(`p_${k}` as const)}</span>
+                      <span className="muted small nowrap">{t(`p_${k}` as const)} <Info wide>{x.rotation[k]}</Info></span>
                       <b style={{ color: scoreColor(r.scores[k]) }}>{r.scores[k]}</b>
                     </div>
                   ))}
-                  <div className="score-chip total"><span className="muted small">{t('total')}</span><b>{r.total}</b></div>
+                  <div className="score-chip total"><span className="muted small nowrap">{t('total')} <Info>{x.rotation.total}</Info></span><b>{r.total}</b></div>
                 </div>
                 <table className="years">
+                  <thead>
+                    <tr>
+                      <th>{t('year')}</th>
+                      <th />
+                      <th className="nowrap">{t('expectedYield')} <Info>{x.rotation.expectedYield}</Info></th>
+                      <th className="nowrap">{lang === 'ro' ? 'Efecte' : 'Effects'} <Info>{x.rotation.effects}</Info></th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {r.years.map((y) => (
                       <tr key={y.year}>
-                        <td>{t('year')} {y.year}</td>
+                        <td>{y.year}</td>
                         <td><b>{cropName(y.crop, lang)}</b></td>
-                        <td className="muted small">{t('expectedYield')}: {fmt(y.expected_yield_kg_ha[0])}–{fmt(y.expected_yield_kg_ha[1])} kg/ha</td>
+                        <td className="small nowrap">{fmt(y.expected_yield_kg_ha[0])}–{fmt(y.expected_yield_kg_ha[1])} kg/ha</td>
                         <td className="small">{y.effects.join('; ')}</td>
                       </tr>
                     ))}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   AttributionControl,
   Map as MlMap,
@@ -12,6 +12,7 @@ import {
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { scoreColor } from '../components/format'
+import Info from '../components/Info'
 import { countyColorExpression } from './regionColors'
 import {
   BASEMAP_URL,
@@ -40,13 +41,14 @@ type Props = {
   choropleth?: Choropleth
   legendLow?: string
   legendHigh?: string
+  legendInfo?: ReactNode
 }
 
 const BUCKETS = [15, 40, 60, 85]
 
 type FeatureRef = { source: 'counties' | 'communes'; id: string | number }
 
-export default function RomaniaMap({ onSelect, initialCounty = 'AB', initialBounds = RO_BOUNDS, choropleth = null, legendLow = 'low', legendHigh = 'high' }: Props) {
+export default function RomaniaMap({ onSelect, initialCounty = 'AB', initialBounds = RO_BOUNDS, choropleth = null, legendLow = 'low', legendHigh = 'high', legendInfo }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MlMap | null>(null)
   const [ready, setReady] = useState(false)
@@ -188,7 +190,7 @@ export default function RomaniaMap({ onSelect, initialCounty = 'AB', initialBoun
       <div ref={container} className="map" />
       {choropleth && (
         <div className="map-legend">
-          <div className="small"><b>{choropleth.label}</b></div>
+          <div className="small"><b>{choropleth.label}</b> {legendInfo && <Info>{legendInfo}</Info>}</div>
           <div className="legend-row">
             <span className="muted tiny">{legendLow}</span>
             {BUCKETS.map((b) => <i key={b} style={{ background: scoreColor(b) }} />)}

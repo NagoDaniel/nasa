@@ -1,8 +1,10 @@
 import type { AgroYearly } from '../../api/types'
 import Card from '../../components/Card'
 import { fmt } from '../../components/format'
+import Info from '../../components/Info'
 import SourceNote from '../../components/SourceNote'
 import { useI18n } from '../../i18n'
+import { useExplain } from '../../i18n/explain'
 
 const ROWS = [
   'heat35_jul_aug', 'heat32_jul_aug', 'heat30_jun', 'rootmoist_jja_z', 'dry_spell_apr_sep',
@@ -12,6 +14,7 @@ const ROWS = [
 
 export default function SeasonEvents({ agro, kind }: { agro: AgroYearly; kind: 'county' | 'commune' }) {
   const { t } = useI18n()
+  const x = useExplain()
   const rows = ROWS.filter((k) => agro.indicators[k] && agro.values[k])
   const hit = (k: string, v: number | null) => {
     const h = agro.hazards[k]
@@ -19,7 +22,7 @@ export default function SeasonEvents({ agro, kind }: { agro: AgroYearly; kind: '
     return h.op === '>=' ? v >= h.threshold : v <= h.threshold
   }
   return (
-    <Card title={t('seasonEvents')} sub={t('seasonEventsSub')}>
+    <Card title={t('seasonEvents')} sub={t('seasonEventsSub')} info={x.general.eventsTable}>
       <div className="table-scroll">
         <table className="events">
           <thead>
@@ -33,8 +36,8 @@ export default function SeasonEvents({ agro, kind }: { agro: AgroYearly; kind: '
               const meta = agro.indicators[k]
               return (
                 <tr key={k}>
-                  <th title={`${meta.why}\n${agro.hazards[k]?.text ?? ''}`}>
-                    {meta.label}
+                  <th>
+                    {meta.label} <Info>{x.agro[k] ?? `${meta.why} ${agro.hazards[k]?.text ?? ''}`}</Info>
                     <span className="muted"> · {agro.hazards[k]?.text}</span>
                   </th>
                   {agro.values[k].map((v, i) => (

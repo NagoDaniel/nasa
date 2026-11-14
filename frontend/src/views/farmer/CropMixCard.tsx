@@ -1,8 +1,10 @@
 import type { AreaBundle, CropMap } from '../../api/types'
 import Card from '../../components/Card'
 import { fmt } from '../../components/format'
+import Info from '../../components/Info'
 import SourceNote from '../../components/SourceNote'
 import { useI18n } from '../../i18n'
+import { useExplain } from '../../i18n/explain'
 
 // EUCROPMAP code -> INS crop id (for the county cross-check)
 const INS_ID: Record<string, string> = { '216': 'maize', '211': 'wheat', '213': 'barley', '215': 'oats', '231': 'sunflower', '233': 'soy', '232': 'rapeseed', '240': 'grain_legumes' }
@@ -10,6 +12,7 @@ const YEAR_IDX: Record<string, number> = { '2018': 3, '2022': 7 }
 
 export default function CropMixCard({ cm, stats, kind }: { cm: CropMap; stats: AreaBundle['crop_stats']; kind: 'county' | 'commune' }) {
   const { lang } = useI18n()
+  const x = useExplain()
   const v = cm.values
   if (!v) return null
   const years = cm.years.filter((y) => v[y])
@@ -24,14 +27,15 @@ export default function CropMixCard({ cm, stats, kind }: { cm: CropMap; stats: A
     <Card
       title={lang === 'ro' ? 'Structura culturilor (hartă satelitară)' : 'Crop mix (satellite crop map)'}
       sub={lang === 'ro' ? 'Hectare pe cultură, teren arabil' : 'Hectares per crop on arable land'}
-      right={<span className="pill">{lang === 'ro' ? 'Leguminoase' : 'Legumes'}: {years.map((y) => `${y} ${fmt(100 * legume(y), 1)}%`).join(' → ')}</span>}
+      info={x.cropMix.ha}
+      right={<span className="nowrap"><span className="pill">{lang === 'ro' ? 'Leguminoase' : 'Legumes'}: {years.map((y) => `${y} ${fmt(100 * legume(y), 1)}%`).join(' → ')}</span> <Info>{x.cropMix.legumes}</Info></span>}
     >
       <table className="mix">
         <thead>
           <tr>
             <th />
-            {years.map((y) => <th key={y}>{y}</th>)}
-            {kind === 'county' && <th className="muted">INS {years.join(' / ')}</th>}
+            {years.map((y, i) => <th key={y}>{y} {i === 0 && <Info>{<>{x.cropMix.ha} {x.cropMix.pct}</>}</Info>}</th>)}
+            {kind === 'county' && <th className="muted">INS {years.join(' / ')} <Info>{x.cropMix.ins}</Info></th>}
           </tr>
         </thead>
         <tbody>

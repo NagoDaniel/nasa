@@ -4,9 +4,11 @@ import type { ProcurementResponse } from '../../api/types'
 import Card from '../../components/Card'
 import Chart, { PALETTE, type ChartOption } from '../../components/Chart'
 import { fmt, scoreColor } from '../../components/format'
+import Info from '../../components/Info'
 import SourceNote, { ConfidenceBadge } from '../../components/SourceNote'
 import { useAsync } from '../../components/useAsync'
 import { useI18n } from '../../i18n'
+import { useExplain } from '../../i18n/explain'
 import { B_CROPS, cropName } from '../../i18n/names'
 
 export type Metric = 'availability' | 'quality' | 'impact'
@@ -59,6 +61,8 @@ export default function ProcurementView({ onChoropleth, selectedCounty }: {
 
 function Body({ d, crop, selected }: { d: ProcurementResponse; crop: string; selected: string | null }) {
   const { t, lang } = useI18n()
+  const x = useExplain()
+  const P = x.procurement
   const rows = Object.entries(d.counties).sort((a, b) => (b[1].availability.production_t_median_5y ?? 0) - (a[1].availability.production_t_median_5y ?? 0))
   const total = rows.reduce((s, [, v]) => s + (v.availability.production_t_median_5y ?? 0), 0)
 
@@ -80,49 +84,52 @@ function Body({ d, crop, selected }: { d: ProcurementResponse; crop: string; sel
   return (
     <>
       {d.proxy && <p className="note warn">{t('proxyNote')}</p>}
-      <Card title={`${cropName(crop, lang)} — ${t('availability')} · ${t('quality')} · ${t('impact')}`}>
+      <Card title={`${cropName(crop, lang)} — ${t('availability')} · ${t('quality')} · ${t('impact')}`} info={x.general.scoreScale}>
         <div className="table-scroll">
           <table className="proc">
             <thead>
               <tr>
                 <th>{t('county')}</th>
-                <th className="num">{t('production5y')}</th>
-                <th className="num">{t('share')}</th>
-                <th>{t('availability')}</th>
-                <th>{t('quality')}</th>
-                <th>{t('thisSeason')}</th>
-                <th>{t('impact')}</th>
-                <th className="num">{t('waterNeed')}</th>
-                <th className="num">{t('emissions')}</th>
-                <th>{t('confidence')}</th>
+                <th className="num">{t('production5y')} <Info>{P.production5y}</Info><div className="muted tiny">{t('share')} <Info>{P.share}</Info></div></th>
+                <th>{t('availability')} <Info wide><>{P.availability}<br /><br />{P.availabilitySub}</></Info></th>
+                <th>{t('quality')} <Info>{P.quality}</Info></th>
+                <th>{t('thisSeason')} <Info>{P.thisSeason}</Info></th>
+                <th>
+                  {t('impact')} <Info>{P.impact}</Info>
+                  <div className="muted tiny">{t('waterNeed')} <Info wide>{P.water}</Info> · {t('emissions')} <Info wide>{P.emissions}</Info></div>
+                </th>
+                <th>{t('confidence')} <Info>{P.confidence}</Info></th>
               </tr>
             </thead>
             <tbody>
               {rows.map(([code, v]) => (
                 <tr key={code} className={code === selected ? 'sel' : ''}>
                   <td><b>{v.name}</b></td>
-                  <td className="num">{fmt(v.availability.production_t_median_5y)} t</td>
-                  <td className="num">{total ? fmt((100 * (v.availability.production_t_median_5y ?? 0)) / total) : '–'}%</td>
+                  <td className="num">
+                    {fmt(v.availability.production_t_median_5y)} t
+                    <div className="muted tiny">{total ? fmt((100 * (v.availability.production_t_median_5y ?? 0)) / total) : '–'}%</div>
+                  </td>
                   <td><Score s={v.availability.score} sub={`${v.availability.hazard_years}/${v.availability.years} bad yrs · CV ${fmt((v.availability.yield_cv ?? 0) * 100)}%`} /></td>
                   <td><Score s={v.quality.score} /></td>
                   <td className="small">{v.quality.latest_hits.length ? [...new Set(v.quality.latest_hits.map((h) => HAZARD_SHORT[h] ?? h))].join(', ') : <span className="muted">–</span>}</td>
-                  <td><Score s={v.impact.score} /></td>
-                  <td className="num small">{fmt(v.impact.dry_year_rain_mm)} / {v.impact.water_need_mm[0]}–{v.impact.water_need_mm[1]} mm</td>
-                  <td className="num small">{v.impact.emissions_kg_co2e_t === null ? '–' : `${fmt(v.impact.emissions_kg_co2e_t)} kg CO₂e/t`}</td>
-                  <td><ConfidenceBadge level={v.confidence} /></td>
+                  <td>
+                    <Score s={v.impact.score} />
+                    <div className="muted tiny nowrap">{fmt(v.impact.dry_year_rain_mm)} / {v.impact.water_need_mm[0]}–{v.impact.water_need_mm[1]} mm</div>
+                    <div className="muted tiny nowrap">{v.impact.emissions_kg_co2e_t === null ? '–' : `${fmt(v.impact.emissions_kg_co2e_t)} kg CO₂e/t`}</div>
+                  </td>
+                  <td><ConfidenceBadge level={v.confidence} info={false} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="muted small">Water: dry-year Apr–Sep rain / crop need. Emissions: field N₂O from fertiliser only.</p>
       </Card>
 
       <Card title={t('recommendations')}>
         <div className="recs">
           {d.recommendations.map((r, i) => (
             <div key={i} className={`rec rec-${r.type}`}>
-              <h4>{r.title}</h4>
+              <h4>{r.title} {P[`rec_${r.type}` as keyof typeof P] && <Info wide>{P[`rec_${r.type}` as keyof typeof P]}</Info>}</h4>
               <p>{r.text}</p>
               {r.assumptions && <details><summary>{t('assumptions')}</summary><ul className="small">{r.assumptions.map((a) => <li key={a}>{a}</li>)}</ul></details>}
             </div>
@@ -130,7 +137,7 @@ function Body({ d, crop, selected }: { d: ProcurementResponse; crop: string; sel
         </div>
       </Card>
 
-      <Card title={t('productionChart')}>
+      <Card title={t('productionChart')} info={P.productionChart}>
         <Chart option={chart} height={240} />
       </Card>
 

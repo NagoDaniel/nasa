@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { I18nProvider, useI18n } from './i18n'
+import { useExplain } from './i18n/explain'
 import RomaniaMap, { type AreaSelection, type Choropleth } from './map/RomaniaMap'
 import { AOI } from './map/style'
 import FarmerView from './views/farmer/FarmerView'
@@ -12,6 +13,7 @@ const ALBA: AreaSelection = { kind: 'county', code: 'AB', name: 'Alba', region: 
 
 function Shell() {
   const { t, lang, setLang } = useI18n()
+  const x = useExplain()
   const [tab, setTab] = useState<Tab>('farmer')
   const [sel, setSel] = useState<AreaSelection>(ALBA)
   const [choropleth, setChoropleth] = useState<Choropleth>(null)
@@ -45,6 +47,7 @@ function Shell() {
             choropleth={tab === 'procurement' ? choropleth : null}
             legendLow={t('legendLow')}
             legendHigh={t('legendHigh')}
+            legendInfo={x.procurement.choropleth}
           />
           <div className="selection">
             <div className="muted tiny">{sel.kind === 'county' ? t('county') : t('commune')}</div>
