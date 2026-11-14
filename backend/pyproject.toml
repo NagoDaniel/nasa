@@ -17,6 +17,20 @@ scripts = [
     "shapely>=2.0",
     "requests>=2.32",
 ]
+process = [
+    "xarray>=2025.1",
+    "netCDF4>=1.7",
+    "h5netcdf>=1.4",
+    "rasterio>=1.4",
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "shapely>=2.0",
+    "pyproj>=3.6",
+]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.28",
+]
 
 [tool.uv]
 package = false

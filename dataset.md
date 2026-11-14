@@ -235,7 +235,7 @@ These come from NASA AppEEARS (`appeears.earthdatacloud.nasa.gov`) area requests
 
 - **Full requests:** AOI = `aoi_union` (or Alba only where noted), output projection `geographic` (EPSG:4326).
 - **Samples (available first):** `data/_samples/<same sub-path>/`, Alba county only, 2024 (or July 2024 for the high-volume products).
-- **Full data:** lands in `data/<sub-path>/` with **the same file naming**, so code written against the samples works unchanged; only the folder differs.
+- **Full data:** lands in `data/<sub-path>/` with the same file names. Only the date-range subfolder name differs, so glob for it (see below) and code written against the samples works unchanged.
 - **Structure:** the section "AppEEARS output structure" below is filled in from the real sample files once they arrive. Treat it as the source of truth over anything else.
 
 | Sub-path | Product | Layers | Full extent / period | Format |
@@ -260,7 +260,54 @@ These come from NASA AppEEARS (`appeears.earthdatacloud.nasa.gov`) area requests
 
 ### AppEEARS output structure
 
-_To be filled in from `data/_samples/` once the sample requests finish._
+Verified against the real sample files in `data/_samples/` (Alba county, 2024). Products marked ⏳ have not arrived yet; their entries will be added when they do.
+
+**Folder layout (same for every GeoTIFF request):**
+
+```
+<sub-path>/                                    e.g. vegetation/modis_mod13q1_ndvi_evi/
+  <Product>.<Ver>_<YYYYDDD>_to_<YYYYDDD>/      the rasters; the date range in this folder name differs between the sample and the full request
+    <Product>.<Ver>_<Layer>_doy<YYYYDDD>000000_aid0001.tif
+  <Product>-<Ver>-Statistics.csv               per-date polygon statistics, already scaled (quick time series without opening rasters)
+  <Product>-<Ver>-<QA-layer>-lookup.csv        decodes QA/QC integer values into readable flags
+  <Product>-<Ver>-<QA-layer>-Statistics-QA.csv pixel count per QA value per date
+  README.md, *-request.json, *-metadata.xml, *-granule-list.txt
+```
+
+- **Find rasters with a glob:** use `<sub-path>/*/<Product>.<Ver>_<Layer>_doy*.tif`. Don't hard-code the date-range folder.
+- **Dates:** `doy<YYYYDDD>000000` is the composite **start** date as year + day of year, e.g. `doy2024017000000` = 2024-01-17. Parse with `datetime.strptime(s[3:10], '%Y%j')`.
+  - A composite that starts in late December and overlaps January is included, so the sample starts at 2023-12-19.
+- **Masking:** AppEEARS clips to the polygon. Pixels outside it are set to the layer's nodata value.
+- **Raster format:** GeoTIFF, EPSG:4326, single band.
+- **Values are raw integers.** The scale factor is in the band metadata: `rasterio.open(f).scales[0]`, or the `scale_factor` tag. Multiply after masking nodata.
+- **Extra layers:** AppEEARS adds the matching QA layers automatically, so there are more layers than were requested.
+
+| Product (sub-path) | Layer → file `<Layer>` part | dtype | nodata | scale → unit | Grid (Alba sample) | Dates in 2024 sample |
+|---|---|---|---|---|---|---|
+| MOD13Q1.061 (`vegetation/modis_mod13q1_ndvi_evi`) | `_250m_16_days_NDVI` (note the **double underscore** after `MOD13Q1.061`) | int16 | -3000 | × 0.0001 → NDVI (valid −0.2…1.0) | 0.002083° (≈250 m), 536 × 759 | 24 (16-day) |
+| | `_250m_16_days_EVI` | int16 | -3000 | × 0.0001 → EVI | same | 24 |
+| | `_250m_16_days_pixel_reliability` | int32 | -1 | 0 good, 1 marginal, 2 snow/ice, 3 cloudy | same | 24 |
+| | `_250m_16_days_VI_Quality` (added automatically) | uint16 | 65535 | bit field; decode with `*-VI-Quality-lookup.csv` | same | 24 |
+| MOD16A2GF.061 (`evapotranspiration/modis_mod16a2gf_et_500m`) | `ET_500m`, `PET_500m` | int16 | 32767 | × 0.1 → kg/m² = **mm per 8-day period** | 0.004167° (≈500 m), 268 × 380 | 47 (8-day) |
+| | `ET_QC_500m` | uint8 | 255 | bit field; see lookup CSV | same | 47 |
+| MOD11A2.061 (`temperature/modis_mod11a2_lst_1km`) | `LST_Day_1km`, `LST_Night_1km` | uint16 | 0 | × 0.02 → **K** (−273.15 for °C) | 0.008333° (≈1 km), 135 × 191 | 47 (8-day) |
+| | `QC_Day`, `QC_Night` (Night added automatically) | uint8 | 0 | bit field; see `*-QC-Day-lookup.csv` | same | 47 |
+| SRTMGL1_NC.003 (`terrain/srtm_gl1_30m`) | `SRTMGL1_DEM`, in folder `SRTMGL1_NC.003_2000001_to_<YYYYDDD>/` | int16 | -32768 | metres (no scaling) | 0.000278° (≈30 m), 4,007 × 5,686 | 1 (static, doy2000042) |
+| SRTMGL1_NUMNC.003 (added automatically, own folder) | `SRTMGL1_NUM` | int16 | 0 | number of source scenes per pixel | same | 1 |
+
+**Value checks on the Alba sample (after scaling):**
+- NDVI median 0.47, maximum 0.999.
+- ET median 2.7 mm per 8 days. Raw ET/PET values **32761–32766 are special fill codes** (water, urban, barren and similar). Treat raw > 32700 as missing, not only 32767.
+- LST in January is about 277 K by day (4 °C).
+- Elevation is 198–2,125 m.
+
+**Statistics CSV columns:** `File Name, Dataset, aid, Date (YYYY-MM-DD), Count, Minimum, Maximum, Range, Mean, Standard Deviation, Variance, Upper Quartile, Upper 1.5 IQR, Median, Lower 1.5 IQR, Lower Quartile`. Values are already scaled.
+- These are statistics for the **whole request polygon**: Alba county in the sample, the 8-county union in the full requests. Per-commune values need zonal statistics on the rasters.
+
+**⏳ Not arrived yet:** SMAP L3 and L4 (NetCDF4), ECOSTRESS and HLS (GeoTIFF). Until they arrive:
+- use GLDAS for soil moisture
+- use MOD13Q1 for vegetation (HLS adds 30 m detail)
+- use MOD16A2GF for evapotranspiration (ECOSTRESS adds 70 m detail)
 
 ---
 

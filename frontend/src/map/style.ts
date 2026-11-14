@@ -8,6 +8,8 @@ export const RO_BOUNDS: LngLatBoundsLike = [[20.2, 43.6], [29.8, 48.3]]
 export const RO_MAX_BOUNDS: LngLatBoundsLike = [[18.2, 42.6], [31.8, 49.3]]
 
 export const MASK_COLOR = '#eef1f4'
+/** Study area: Alba + neighbouring counties (the only ones with processed data). */
+export const AOI = ['AB', 'AR', 'BH', 'CJ', 'HD', 'MS', 'SB', 'VL']
 const FONT_REG = ['Noto Sans Regular']
 const FONT_BOLD = ['Noto Sans Bold']
 const FONT_ITALIC = ['Noto Sans Italic']
@@ -51,6 +53,20 @@ function countyOpacity(base: number): ExpressionSpecification {
   ]
 }
 
+// zoom must be the top-level input, so the hover/selected case sits inside each stop
+export const COUNTY_OPACITY: ExpressionSpecification = [
+  'interpolate', ['linear'], ['zoom'],
+  6, countyOpacity(0.32),
+  9, countyOpacity(0.18),
+  12, countyOpacity(0.08),
+]
+export const CHOROPLETH_OPACITY: ExpressionSpecification = [
+  'interpolate', ['linear'], ['zoom'],
+  6, countyOpacity(0.7),
+  9, countyOpacity(0.45),
+  12, countyOpacity(0.2),
+]
+
 /** Layers placed low in the stack (under roads / water / labels). */
 export const lowLayers: LayerSpecification[] = [
   {
@@ -70,14 +86,15 @@ export const lowLayers: LayerSpecification[] = [
     source: 'counties',
     paint: {
       'fill-color': countyColorExpression,
-      // zoom must be the top-level input, so the hover/selected case sits inside each stop
-      'fill-opacity': [
-        'interpolate', ['linear'], ['zoom'],
-        6, countyOpacity(0.32),
-        9, countyOpacity(0.18),
-        12, countyOpacity(0.08),
-      ],
+      'fill-opacity': COUNTY_OPACITY,
     },
+  },
+  {
+    id: 'county-outside',
+    type: 'fill',
+    source: 'counties',
+    filter: ['!', ['in', ['get', 'code'], ['literal', AOI]]],
+    paint: { 'fill-color': '#e5e7eb', 'fill-opacity': 0.55 },
   },
   {
     id: 'commune-fill',

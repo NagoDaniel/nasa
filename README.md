@@ -55,4 +55,12 @@ cd backend && uv run --group scripts python scripts/build_boundaries.py
 - Commune names (diacritics): © OpenStreetMap contributors, ODbL
 - Basemap: [OpenFreeMap](https://openfreemap.org), © OpenMapTiles, © OpenStreetMap contributors
 - Terrain: Mapzen / AWS Terrain Tiles
-- NASA datasets: listed per dataset as they are added (`source` field)
+- NASA: POWER daily (MERRA-2 / CERES), GPM IMERG Final V07B, GLDAS Noah 2.1, FIRMS VIIRS S-NPP, MODIS MOD13Q1 (via AppEEARS; sample so far)
+- ISRIC SoilGrids 2.0 (CC BY 4.0); JRC EUCROPMAP 2018/2022 (CC BY 4.0, © European Union); INS TEMPO Online (AGR108A/109A/110A)
+- Crop traits: FAO (Brouwer & Heibloem 1986; FAO-56), FAO Ecocrop, IPCC 2019 / AR6, Peoples et al. 2009, Preissel et al. 2015, Seifert et al. 2017
+
+Rebuild the processed data from the raw downloads in `backend/.cache/raw/` (see `dataset.md`):
+
+```bash
+cd backend && uv run --group process python scripts/process/build_all.py
+```

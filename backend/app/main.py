@@ -7,7 +7,7 @@ from fastapi.responses import ORJSONResponse
 
 from .config import settings
 from .db import init_db
-from .routers import geo, health, nasa
+from .routers import area, crops, geo, health, nasa
 
 
 @asynccontextmanager
@@ -30,5 +30,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (health.router, geo.router, nasa.router):
+for r in (health.router, geo.router, nasa.router, area.router, crops.router):
     app.include_router(r, prefix="/api")
