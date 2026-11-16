@@ -4,8 +4,6 @@ Decision-support tool for farmers (crop rotations, soil and water) with a procur
 lens for the Transavia **SMART FEED** (pet food) direction: oats, barley, maize, pea,
 chickpea, flax, sunflower.
 
-*Built at the NASA Space Apps Challenge. Not endorsed by NASA.*
-
 ![SPACE2FEED dashboard showing the rainfall map, area overview and AI assistant](docs/images/space2feed-dashboard.png)
 
 ## Stack
