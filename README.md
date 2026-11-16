@@ -6,8 +6,6 @@ chickpea, flax, sunflower.
 
 *Built at the NASA Space Apps Challenge. Not endorsed by NASA.*
 
-[Quick live demo](https://cabin-stored-pack-lid.trycloudflare.com/)
-
 ![SPACE2FEED dashboard showing the rainfall map, area overview and AI assistant](docs/images/space2feed-dashboard.png)
 
 ## Stack
